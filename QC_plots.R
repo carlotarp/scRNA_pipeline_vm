@@ -235,19 +235,27 @@ plot_pct_filtered_by_subtype <- function(cell_counts_df, sample_annot, results_p
 }
 
 # ---------------------------------------------------------------
-# nFeature_RNA vs nCount_RNA scatter, colored by singlet/doublet
+# scDblFinder.score vs nCount_RNA scatter & nFeature_RNA, colored by singlet/doublet
 # ---------------------------------------------------------------
-plot_doublet_scatter <- function(object, name, results_path) {
-  df <- object@meta.data
+plot_doublet_scatter <- function(df, name, results_path) {
 
-  p <- ggplot(df, aes(x = nCount_RNA, y = scDblFinder.score, color = scDblFinder.class)) +
+  c <- ggplot(df, aes(x = nCount_RNA, y = scDblFinder.score, color = scDblFinder.class)) +
     geom_point(size = 0.6, alpha = 0.6) +
     scale_color_manual(values = c("singlet" = "steelblue", "doublet" = "firebrick")) +
-    labs(title = paste("nFeature vs nCount -", name),
-         x = "nCount_RNA", y = "nFeature_RNA", color = "scDblFinder class") +
+    labs(title = paste("scDblFinder score vs nCount -", name),
+         x = "nCount_RNA", y = "scDblFinder score", color = "scDblFinder class") +
     theme_bw() +
     theme(panel.grid = element_blank())
 
-  ggsave(paste0(results_path, "DoubletScatter_", name, ".png"), p,
-         width = 7, height = 5, dpi = 300)
+  f <- ggplot(df, aes(x = nFeature_RNA, y = scDblFinder.score, color = scDblFinder.class)) +
+  geom_point(size = 0.6, alpha = 0.6) +
+  scale_color_manual(values = c("singlet" = "steelblue", "doublet" = "firebrick")) +
+  labs(title = paste("scDblFinder score vs nFeature_RNA -", name),
+       x = "nFeature_RNA", y = "scDblFinder score", color = "scDblFinder class") +
+  theme_bw() +
+  theme(panel.grid = element_blank())
+
+  combined <- (c | f) + patchwork::plot_annotation(title = paste("scDblFinder score vs QC metrics -", name))
+  ggsave(paste0(results_path, "DoubletScatter_", name, ".png"), combined,
+         width = 15, height = 5, dpi = 300)
 }

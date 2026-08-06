@@ -1,5 +1,5 @@
 ##
-##  Single Cell Analysis Step 2: Sample Annotation & Clustering
+##  Single Cell Analysis Step 2a: Sample Annotation & Clustering
 ##
 
 # Import libraries
@@ -43,7 +43,7 @@ dwIntegrated <- FindNeighbors(dwIntegrated, reduction = "harmony", dims = 1:co3)
 plot_resolution_grid(dwIntegrated, results_path = results_GEMX_CL_path,
                           reduction = "harmony",
                           resolutions = c(0.2, 0.4, 0.6, 0.8, 1.0))
-res <- 0.4
+res <- 0.6
 cat(paste("\n The Optimal Resolution is", res, "\n"))
 
 # Generate Clusters

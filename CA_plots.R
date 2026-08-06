@@ -1,6 +1,6 @@
 ##
 ## Plotting functions for scRNA-seq Cell Annotation pipeline
-## Source this file from 4_seurat_cell_annotation.R & 5_seurat_cell_subtype_annotation.R .
+## Source this file from 3a_seurat_cell_annotation.R & 3b_seurat_cell_subtype_annotation.R .
 ##
 library(ggplot2)
 library(Seurat)

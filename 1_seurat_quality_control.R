@@ -26,6 +26,7 @@ sample_list <- list()
 cell_counts <- list()
 cell_counts_names <- list()
 sample_cell_counts <- list()
+doublet_list <- list()
 
 # Load sample Function
 load_read10X_sample <- function(cellranger_path, name, data_path, min_cells=3, min_features=200){
@@ -79,9 +80,13 @@ process_sample <- function(name, tumor, mito_cut, feature_lower_cut, feature_upp
     sample$scDblFinder.class <- colData(sce)$scDblFinder.class
     sample$scDblFinder.score <- colData(sce)$scDblFinder.score
 
+    df_snapshot <- sample@meta.data
+    df_snapshot$SampleID <- name
+    doublet_list[[name]] <<- df_snapshot
+
     # --- Doublet score distribution, BEFORE removing doublets ---
     plot_doublet_scores(sample, name = name, results_path = results_path)
-    plot_doublet_scatter(object = sample, name = name, results_path = results_path)
+    plot_doublet_scatter(object = sample@meta.data, name = name, results_path = results_path)
 
     sample <- subset(x = sample, subset = scDblFinder.class == "singlet")
     cell_counts <<- append(cell_counts, nrow(sample@meta.data))
@@ -115,6 +120,10 @@ for (name in sample_names){
     plot_nfeature_ncount_corr(tumor = tumor, name = name, results_path = results_GEMX_QC_path)
 }
 cat("\n Samples Loaded and Processed \n")
+
+# --- Doublet score distribution (all samples) ---
+doublet_df <- do.call(rbind, doublet_list)
+plot_doublet_scatter(doublet_df, name = "AllSamples", results_path = results_GEMX_QC_path)
 
 # Write Cell filtering Table
 cell_counts_df <- data.frame('Cell_counts'=c(unlist(cell_counts)),
@@ -185,7 +194,7 @@ dwIntegrated@meta.data <- dwIntegrated@meta.data %>%
     left_join(annot_df, by = c("orig.ident" = "scRNAseq_ID")) %>%
     column_to_rownames("cell_id")
 dwIntegrated$Subtype <- factor(dwIntegrated$Subtype)
-saveRDS(dwIntegrated, file.path(results_GEMX_QC_path, "annotated_sample_data.rds"))
+saveRDS(dwIntegrated, file.path(results_GEMX_QC_path, "sample_annotated_data.rds"))
 cat("\n Sample Subtypes Annotated \n")
 
 cat(paste("\n ---- FINISHED QUALITY CONTROL, INTEGRATION & SAMPLE ANNOTATION ----

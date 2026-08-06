@@ -1,5 +1,5 @@
 ##
-##  Single Cell Analysis Step 2.5: Convert Data Format to .h5ad
+##  Single Cell Analysis Step 2b: Convert Data Format to .h5ad
 ##
 
 # Set environment
