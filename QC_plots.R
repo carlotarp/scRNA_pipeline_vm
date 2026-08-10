@@ -32,15 +32,15 @@ plot_nfeature_ncount_corr <- function(tumor, name, results_path) {
        border = "white")
 
   # QC cutoffs (high)
-  abline(v = 2500, col = "orange", lwd = 2, lty = 2)
-  abline(v = 5000, col = "darkorange", lwd = 2, lty = 2)
-  abline(v = 7500, col = "red", lwd = 3, lty = 2)
+  abline(v = 3500, col = "orange", lwd = 2, lty = 2)
+  abline(v = 5500, col = "darkorange", lwd = 2, lty = 2)
+  abline(v = 7500, col = "red", lwd = 2, lty = 2)
 
   # Percentiles (low)
   abline(v = 100, col = "darkgreen", lwd = 3, lty = 1)
 
   legend("topright",
-         legend = c("2500", "5000", "7500(used)", "100(used)"),
+         legend = c("3500", "5500", "7500", "100"),
          col = c("orange", "darkorange", "red", "darkgreen"),
          lwd = 2, lty = c(2, 2, 2, 1), cex = 0.75)
   dev.off()

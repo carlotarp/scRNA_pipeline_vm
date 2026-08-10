@@ -13,21 +13,21 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CNV_path <- paste0(results_path, "GEMX/CellAnnotation/InferCNV/")
+results_GEMX_CNV_path <- paste0(results_path, "GEMX/CellAnnotation/3500/InferCNV/")
 
 # Load Annotated Data
-dwAnnotated <- readRDS(paste0(results_path, "GEMX/CellAnnotation/lineage_annotated_data.rds"))
+dwAnnotated <- readRDS(paste0(results_path, "GEMX/CellAnnotation/3500/notumor_annotated_data.rds"))
 cat("\n Annotated Data Loaded \n")
 
+dwAnnotated <- CellCycleScoring(dwAnnotated,
+                                s.features = cc.genes.updated.2019$s.genes,
+                                g2m.features = cc.genes.updated.2019$g2m.genes)
+
 # Classify cells
-clusters_normal <- c(3, 4, 11, 12) # Clusters we know are normal
-
-dwAnnotated$dataset <- ifelse(dwAnnotated$lineage == "Tumoral",
+dwAnnotated$dataset <- ifelse(dwAnnotated$celltype == "Tumor",
                                paste0("TUMOR_", dwAnnotated$orig.ident),
-                               "NORMAL")
-dwAnnotated$dataset <- factor(dwAnnotated$dataset, levels = c("NORMAL", "TUMOR"))
-
-
+                               as.character(dwAnnotated$celltype))
+dwAnnotated$dataset <- factor(dwAnnotated$dataset)
 # inferCNV needs raw counts
 dwAnnotated <- JoinLayers(dwAnnotated)
 counts_matrix <- GetAssayData(dwAnnotated, assay = "RNA", layer = "counts")
@@ -47,14 +47,18 @@ write.table(
   col.names = FALSE
 )
 
+# Set Reference Cluster
+ref_groups <- setdiff(levels(dwAnnotated$dataset), grep("^TUMOR_", levels(dwAnnotated$dataset), value = TRUE))
+ref_groups <- setdiff(ref_groups, c("Proliferative", "Fibrocyte"))
+
 # Create inferCNV object
 infercnv_obj <- CreateInfercnvObject(
   raw_counts_matrix = counts_matrix,
   annotations_file = paste0(results_GEMX_CNV_path, "inferCNV_cell_annotations.txt"),
   delim = "\t",
   gene_order_file = "/home/usuario/PROJECTS/260724_victor_scRNA/data/gencode_v19_gene_pos.txt",
-  ref_group_names = c("NORMAL")
-)
+  ref_group_names = ref_groups
+  )
 
 # Run inferCNV
 infercnv_obj_full_run <- infercnv::run(

@@ -20,7 +20,7 @@ cellranger_path <- "/home/usuario/DATASETS/scRNAseq/"
 source(paste0(wd, "CL_plots.R"))
 
 # Load Sample Annotated Data
-dwIntegrated <- readRDS(paste0(results_path, "GEMX/QualityControl/annotated_sample_data.rds"))
+dwIntegrated <- readRDS(paste0(results_path, "GEMX/QualityControl/sample_annotated_data.rds"))
 cat(" Annotated Sample Data Loaded \n")
 
 # Find Optimal Number of PCs

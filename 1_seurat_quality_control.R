@@ -5,8 +5,9 @@
 # Import libreries
 library('Seurat')
 library(dplyr)
+library(tibble)
 library(SingleCellExperiment)
-library(scDblFinder)
+library("scDblFinder")
 
 # Set paths
 project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
@@ -86,7 +87,7 @@ process_sample <- function(name, tumor, mito_cut, feature_lower_cut, feature_upp
 
     # --- Doublet score distribution, BEFORE removing doublets ---
     plot_doublet_scores(sample, name = name, results_path = results_path)
-    plot_doublet_scatter(object = sample@meta.data, name = name, results_path = results_path)
+    plot_doublet_scatter(df = sample@meta.data, name = name, results_path = results_path)
 
     sample <- subset(x = sample, subset = scDblFinder.class == "singlet")
     cell_counts <<- append(cell_counts, nrow(sample@meta.data))
@@ -112,7 +113,7 @@ feature_upper_cut <- 7500
 sample_names <- c('SC7b', 'SC8','SC9','SC10','SC11','SC12','SC13','SC14','SC15','SC16','SC17','SC18','SC19','SC20','SC21','SC5_SC22') #GEMX
 
 for (name in sample_names){
-    tumor <- load_read10X_sample(cellranger_path = GEMX_path, name = name, data_path = data_path, min_cells = 3, min_features = 200)
+    tumor <- load_read10X_sample(cellranger_path = GEMX_path, name = name, data_path = data_path, min_cells = min_cells, min_features = min_features)
     tumor <- process_sample(name = name, tumor = tumor, mito_cut = mito_cut, feature_lower_cut = feature_lower_cut, feature_upper_cut = feature_upper_cut, results_path = results_GEMX_QC_path)
 
     # --- Plots POST-filter ---
@@ -193,9 +194,10 @@ dwIntegrated@meta.data <- dwIntegrated@meta.data %>%
     rownames_to_column("cell_id") %>%
     left_join(annot_df, by = c("orig.ident" = "scRNAseq_ID")) %>%
     column_to_rownames("cell_id")
+
 dwIntegrated$Subtype <- factor(dwIntegrated$Subtype)
 saveRDS(dwIntegrated, file.path(results_GEMX_QC_path, "sample_annotated_data.rds"))
-cat("\n Sample Subtypes Annotated \n")
+cat("\n Samples Annotated \n")
 
 cat(paste("\n ---- FINISHED QUALITY CONTROL, INTEGRATION & SAMPLE ANNOTATION ----
     Generated files:
