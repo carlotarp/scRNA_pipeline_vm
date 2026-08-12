@@ -49,7 +49,7 @@ write.table(
 
 # Set Reference Cluster
 ref_groups <- setdiff(levels(dwAnnotated$dataset), grep("^TUMOR_", levels(dwAnnotated$dataset), value = TRUE))
-ref_groups <- setdiff(ref_groups, c("Proliferative", "Fibrocyte"))
+ref_groups <- setdiff(ref_groups, c("Prolifetarive", "Fibrocyte"))
 
 # Create inferCNV object
 infercnv_obj <- CreateInfercnvObject(
@@ -68,7 +68,12 @@ infercnv_obj_full_run <- infercnv::run(
   cluster_by_groups = TRUE,
   denoise = TRUE,
   HMM = TRUE,
-  analysis_mode = "samples"
+  analysis_mode = "samples",
+  no_plot = T,
+  no_prelim_plot = T,
+  output_format = "pdf",
+  num_threads = 15
+
 )
 
 # Generate Plot

@@ -11,13 +11,14 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/3500/")
 results_GEMX_LCA_path <- paste0(results_GEMX_CA_path, "Leukocytes/")
 
 # Import Plot Functions
 source(paste0(wd, "CA_plots.R"))
 
 # Load lineage Annotated Data
+dwAnnotated <- dwClustered
 dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "lineage_annotated_data.rds"))
 cat("\n lineage-annotated data loaded \n")
 

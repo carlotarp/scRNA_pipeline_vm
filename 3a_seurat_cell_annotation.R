@@ -11,13 +11,13 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/3500/")
 
 # Import Plot Functions
 source(paste0(wd, "CA_plots.R"))
 
 # Load Clustered Data
-dwClustered <- readRDS(paste0(results_path, "GEMX/Clustering/7500/clustered_data.rds"))
+dwClustered <- readRDS(paste0(results_path, "GEMX/Clustering/3500/clustered_data.rds"))
 cat("\n Clustered Data Loaded \n")
 
 # Set Markers
@@ -126,13 +126,13 @@ plot_dimplot(dwClustered, reduction = "umap", group_by = "lineage",
              results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_Lineage.png")
 
 subtype_clusters_annotated <- c( #########  3500  #########
-  "0" = "Tumor", "1" = "Tumor", "2" = "TCell",
-  "3" = "Fibroblast // CAF // Pericyte", "4" = "Myeloid", "5" = "Tumor",
-  "6" = "Fibroblast // CAF", "7" = "Tumor", "8" = "Tumor",
-  "9" = "Endothelial", "10" = "BCell", "11" = "Tumor",
-  "12" = "Tumor", "13" = "PlasmaBlast", "14" = "cCAF",
-  "15" = "Proliferative", "16" = "Mast", "17" = "Tumor",
-  "18" = "Tumor"
+  "0" = "Tumor", "1" = "Tumor", "2" = "Fibroblast // CAF",
+  "3" = "TCell // NK", "4" = "Myeloid", "5" = "Tumor",
+  "6" = "Tumor", "7" = "Tumor", "8" = "Fibroblast // CAF",
+  "9" = "Endothelial", "10" = "BCell", "11" = "PlasmaBlast",
+  "12" = "cCAF", "13" = "Fibroblast // CAF // Pericyte", "14" = "Tumor",
+  "15" = "Mast", "16" = "Proliferative", "17" = "DC",
+  "18" = "Adipocyte"
 )
 
 subtype_clusters_annotated <- c( #########  5500  #########

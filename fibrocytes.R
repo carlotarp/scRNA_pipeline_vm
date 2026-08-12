@@ -60,52 +60,6 @@ ggsave(paste0(results_GEMX_LCA_path, "PTPRC_cluster4_vs_Stromal.png"), combined,
 
 
 
-## ============================================================
-## 2. Sub-clustering del cluster 4, buscando subestructura FC-like
-##    (matrix-like vs immune/APC-like, como FC1/FC3 del paper)
-## ============================================================
-
-# Aislar solo el cluster 4 y re-clusterizar a mayor resolución
-dwCluster4 <- subset(dwLeukocytes, idents = "6")
-dwCluster4 <- JoinLayers(dwCluster4)
-
-dwCluster4 <- NormalizeData(dwCluster4)
-dwCluster4 <- FindVariableFeatures(dwCluster4, selection.method = "mean.var.plot")
-dwCluster4 <- ScaleData(dwCluster4)
-dwCluster4 <- RunPCA(dwCluster4, npcs = min(20, ncol(dwCluster4) - 1))
-
-# co3 propio de este sub-subset (mismo criterio que ya usamos)
-pct <- dwCluster4[["pca"]]@stdev / sum(dwCluster4[["pca"]]@stdev) * 100
-cumu <- cumsum(pct)
-co1 <- which(cumu > 90 & pct < 5)[1]
-co2 <- sort(which((pct[1:length(pct) - 1] - pct[2:length(pct)]) > 0.1), decreasing = TRUE)[1] + 1
-co3_c4 <- min(co1, co2, na.rm = TRUE)
-
-dwCluster4 <- FindNeighbors(dwCluster4, dims = 1:co3_c4)
-dwCluster4 <- FindClusters(dwCluster4, resolution = 0.4)
-dwCluster4 <- RunUMAP(dwCluster4, dims = 1:co3_c4)
-
-# Dotplot con el mismo panel de fibrocitos, ahora a resolución fina
-fc_subtype_markers <- list(
-  Matrix_like   = c("COL1A1", "COL3A1", "SPARC", "FAP", "POSTN"),
-  Immune_APC    = c("CD80", "CD86", "CD274", "PTPRC"),
-  Proliferating = c("MKI67", "TOP2A"),
-  Fibrocyte_core = c("EGR1", "TM4SF1", "S100A4", "CD34")
-)
-
-plot_marker_dotplot(dwCluster4, marker_groups = fc_subtype_markers,
-                      results_path = results_GEMX_LCA_path,
-                      filename = "Dotplot_Cluster4_FCsubtypes.png",
-                      group_by = "seurat_clusters",
-                      title = "Sub-clustering of cluster 4 - FC-like subtypes")
-
-plot_dimplot(dwCluster4, reduction = "umap", group_by = "seurat_clusters",
-             results_path = results_GEMX_LCA_path,
-             filename = "DimPlot_Cluster4_subclusters.png", label = TRUE)
-
-cat(paste0("Sub-clusters encontrados dentro del cluster 4: ", length(unique(dwCluster4$seurat_clusters)), "\n"))
-print(table(dwCluster4$seurat_clusters))
-
 
 ##########################################################################333
 
