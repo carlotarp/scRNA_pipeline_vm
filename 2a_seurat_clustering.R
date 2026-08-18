@@ -13,14 +13,13 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CL_path <- paste0(results_path, "GEMX/Clustering/")
-cellranger_path <- "/home/usuario/DATASETS/scRNAseq/"
+results_GEMX_CL_path <- paste0(results_path, "GEMX/Clustering/7500/")
 
 # Import Plot Functions
 source(paste0(wd, "CL_plots.R"))
 
 # Load Sample Annotated Data
-dwIntegrated <- readRDS(paste0(results_path, "GEMX/QualityControl/sample_annotated_data.rds"))
+dwIntegrated <- readRDS(paste0(results_path, "GEMX/QualityControl/7500/sample_annotated_data.rds"))
 cat(" Annotated Sample Data Loaded \n")
 
 # Find Optimal Number of PCs
@@ -155,7 +154,7 @@ cat(paste("\n ---- FINISHED CLUSTERING ----
     Generated plots:
       · ElbowPlot.png
       · ResolutionGrid.png
-      · SankeyPlot.png
+      · SankeyPlot.html
       · DimPlot_(reduction)_(groupedby).png
       · FeaturePlot_(reduction)_(features).png
       · ClusterComposition_(groupedby).png

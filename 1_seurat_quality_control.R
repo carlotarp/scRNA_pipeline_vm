@@ -204,7 +204,7 @@ cat(paste("\n ---- FINISHED QUALITY CONTROL, INTEGRATION & SAMPLE ANNOTATION ---
         · cell_filtering.csv
         · merged_data.rds
         · integrated_harmony_data.rds
-        · annotated_sample_data.rds
+        · sample_annotated_data.rds
     Generated plots:
         · nCountRNA_vs_nFeatureRNA_(sample).png
         · nFeatureRNA_(sample).png
@@ -215,5 +215,5 @@ cat(paste("\n ---- FINISHED QUALITY CONTROL, INTEGRATION & SAMPLE ANNOTATION ---
         · VlnPlot_compare_samples_postQC.png
         · QC_cell_counts_subplots.png
         · QC_percentage_filtered_with_labels.png
-        · DimPlot_(reduction)_by_sample.png
+        · DimPlot_(reduction)_bySample.png
         "))

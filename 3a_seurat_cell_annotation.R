@@ -11,13 +11,13 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/3500/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
 
 # Import Plot Functions
 source(paste0(wd, "CA_plots.R"))
 
 # Load Clustered Data
-dwClustered <- readRDS(paste0(results_path, "GEMX/Clustering/3500/clustered_data.rds"))
+dwClustered <- readRDS(paste0(results_path, "GEMX/Clustering/7500/clustered_data.rds"))
 cat("\n Clustered Data Loaded \n")
 
 # Set Markers
@@ -167,11 +167,10 @@ saveRDS(dwClustered, file.path(results_GEMX_CA_path, "lineage_annotated_data.rds
 cat(paste("\n ---- FINISHED CELL ANNOTATION ----
     Generated files:
       · lineage_annotated_data.rds
-      · ambiguous_cluster_(cluster)_FindMarkers.csv
+      · cluster_(cluster)_FindMarkers.csv
     Generated plots:
-      · lineage_dotplot.png
-      · (lineage)_featureplot.png
-      · lineage_UMAP.png
+      · DotPlot_(lineage).png
+      · Dimlot_(groupedby).png
           "))
 
 

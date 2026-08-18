@@ -10,15 +10,17 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
+project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
+wd <- paste0(project_path, "codes/scRNA_pipeline/")
+setwd(wd)
 results_path <- paste0(project_path, "results/")
 results_COMPARE_path <- paste0(results_path, "GEMX/FullCutoffComparison/")
-dir.create(results_COMPARE_path, recursive = TRUE, showWarnings = FALSE)
 
 # Set paths to each version's FINAL annotated object (after PAM50/PROGENy step)
 cutoff_runs <- list(
-  "cutoff_7500" = paste0(results_path, "GEMX_cutoff7500/TumorAnnotation/fully_annotated_data.rds"),
-  "cutoff_5500" = paste0(results_path, "GEMX_cutoff5500/TumorAnnotation/fully_annotated_data.rds"),
-  "cutoff_3500" = paste0(results_path, "GEMX_cutoff3500/TumorAnnotation/fully_annotated_data.rds")
+  "cutoff_7500" = paste0(results_path, "GEMX/CellAnnotation/7500/fully_annotated_data.rds"),
+  "cutoff_5500" = paste0(results_path, "GEMX/CellAnnotation/5500/fully_annotated_data.rds"),
+  "cutoff_3500" = paste0(results_path, "GEMX/CellAnnotation/3500/fully_annotated_data.rds")
 )
 
 objects_list <- lapply(cutoff_runs, readRDS)
@@ -34,15 +36,6 @@ cat("\n All 3 final annotated versions loaded \n")
 #    that still need it (block E).
 # =================================================================
 
-# --- Fix pure spelling/case inconsistencies (same biological label) ---
-objects_list <- lapply(objects_list, function(obj) {
-  ct <- as.character(obj$celltype)
-  ct <- gsub("^TCell", "Tcell", ct)                   # TCell_naive -> Tcell_naive, etc.
-  ct <- gsub("^Prolifetarive$", "Proliferative", ct)  # typo fix
-  obj$celltype <- factor(ct)
-  obj
-})
-
 # --- Collapse into coarse, cutoff-agnostic categories ---
 collapse_celltype <- function(ct) {
   dplyr::case_when(
@@ -52,7 +45,7 @@ collapse_celltype <- function(ct) {
     grepl("PlasmaBlast", ct, ignore.case = TRUE)              ~ "PlasmaBlast",
     grepl("Mast", ct, ignore.case = TRUE)                     ~ "Mast",
     grepl("Fibrocyte", ct, ignore.case = TRUE)                ~ "Fibrocyte",
-    grepl("Proliferative", ct, ignore.case = TRUE)            ~ "Proliferative",
+    grepl("^Prolif", ct, ignore.case = TRUE)            ~ "Proliferative",
     grepl("CAF|Fibroblast|Pericyte|Adipocyte", ct, ignore.case = TRUE)  ~ "Stromal_fibroblast",
     grepl("Endothelial", ct, ignore.case = TRUE)              ~ "Endothelial",
     grepl("Lum", ct, ignore.case = TRUE)                      ~ "Lum",
@@ -91,7 +84,7 @@ composition_df$pct <- composition_df$n / composition_df$n_total * 100
 write.csv(composition_df, paste0(results_COMPARE_path, "Composition_by_cutoff.csv"), row.names = FALSE)
 
 p_composition <- ggplot(composition_df, aes(x = cutoff_run, y = pct, fill = celltype)) +
-  geom_col(position = "stack") +
+  geom_col() +
   theme_bw() + theme(panel.grid = element_blank(), legend.position = "right") +
   labs(title = "Celltype composition (%) by cutoff", x = NULL, y = "% of cells")
 ggsave(paste0(results_COMPARE_path, "Composition_by_cutoff.png"), p_composition,
@@ -104,6 +97,13 @@ composition_wide <- composition_df %>%
 write.csv(composition_wide, paste0(results_COMPARE_path, "Composition_wide.csv"), row.names = FALSE)
 cat("\n [A] Composition comparison done \n")
 
+p_composition_abs <- ggplot(composition_df, aes(x = celltype, y = n, fill = cutoff_run)) +
+  geom_col(position = "dodge") +
+  theme_bw() + theme(panel.grid = element_blank(),
+                      axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Celltype composition (absolute counts) by cutoff", x = NULL, y = "Number of cells")
+ggsave(paste0(results_COMPARE_path, "Composition_by_cutoff_absolute.png"), p_composition_abs,
+       width = 10, height = 6, dpi = 300, bg = "white")
 
 # =================================================================
 # B + C. Per-celltype barcode overlap (Jaccard) and label stability
@@ -226,60 +226,6 @@ p_qc_status <- ggplot(qc_by_status, aes(x = status, y = nFeature_RNA, fill = sta
 ggsave(paste0(results_COMPARE_path, "QC_stable_vs_unstable_nFeature.png"), p_qc_status,
        width = 6, height = 5, dpi = 300, bg = "white")
 cat("\n [D] QC profile of stable vs cutoff-sensitive cells done \n")
-
-
-# =================================================================
-# E. Marker purity check for a few well-defined celltypes across cutoffs
-#    (are canonical markers as clean/specific in every version, or does
-#    a looser cutoff dilute identity with more ambiguous cells?)
-# =================================================================
-purity_markers <- list(
-  TCell = c("CD3D", "CD3E", "GZMA", "GZMB"),
-  BCell      = c("CD79A", "MS4A1", "CD19"),
-  Mast       = c("TPSAB1", "CPA3", "MS4A2"),
-  Fibrocyte  = c("PTPRC", "COL1A1", "COL3A1")
-)
-
-purity_df <- do.call(rbind, lapply(names(objects_list), function(v) {
-  obj <- objects_list[[v]]
-  do.call(rbind, lapply(names(purity_markers), function(ct) {
-    if (!ct %in% obj$celltype) return(NULL)
-
-        result <- tryCatch({
-          obj_ct <- subset(obj, subset = celltype == ct)
-
-          # Comprobar si realmente quedan varias capas de counts antes de unir
-          count_layers <- grep("^counts", Layers(obj_ct), value = TRUE)
-          if (length(count_layers) > 1) {
-            obj_ct <- JoinLayers(obj_ct, layers = "counts")
-          }
-
-          markers_present <- purity_markers[[ct]][purity_markers[[ct]] %in% rownames(obj_ct)]
-          if (length(markers_present) == 0) return(NULL)
-
-          expr_df <- FetchData(obj_ct, vars = markers_present, layer = "counts")
-          pct <- colMeans(expr_df > 0) * 100
-
-          data.frame(cutoff_run = v, celltype = ct, gene = names(pct), pct_expr = as.numeric(pct))
-        }, error = function(e) {
-          cat(paste0("  [ERROR] ", v, " - ", ct, ": ", conditionMessage(e), "\n"))
-          cat(paste0("    Layers tras intento de join: ", paste(Layers(obj_ct), collapse = ", "), "\n"))
-          return(NULL)
-})
-      result
-  }))
-}))
-
-write.csv(purity_df, paste0(results_COMPARE_path, "Marker_purity_by_cutoff.csv"), row.names = FALSE)
-
-p_purity <- ggplot(purity_df, aes(x = gene, y = pct_expr, fill = cutoff_run)) +
-  geom_col(position = "dodge") +
-  facet_wrap(~celltype, scales = "free_x") +
-  theme_bw() + theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
-  labs(title = "Marker purity (% expressing) by cutoff, per celltype", y = "% cells expressing")
-ggsave(paste0(results_COMPARE_path, "Marker_purity_by_cutoff.png"), p_purity,
-       width = 10, height = 7, dpi = 300, bg = "white")
-cat("\n [E] Marker purity comparison done \n")
 
 
 # =================================================================

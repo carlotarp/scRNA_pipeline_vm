@@ -11,7 +11,7 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/3500/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
 results_GEMX_LCA_path <- paste0(results_GEMX_CA_path, "Leukocytes/")
 
 # Import Plot Functions
@@ -207,11 +207,15 @@ plot_dimplot(dwAnnotated, reduction = "umap", group_by = "celltype", label = T,
 # Export Annotated Data
 saveRDS(dwAnnotated, file.path(results_GEMX_CA_path, "notumor_annotated_data.rds"))
 
-cat(paste("\n ---- FINISHED CELL SUBTYPE ANNOTATION ----
+# Export Clean Annotated Data
+saveRDS(subset(dwAnnotated, subset = celltype != "Fibrocyte"), file.path(results_GEMX_CA_path, "notumor_clean_annotated_data.rds"))
+
+cat(paste("\n ---- FINISHED LEUKOCYTE ANNOTATION ----
     Generated files:
-      · (lineage)_subset.rds
+      · leukocytes.rds
+      · notumor_annotated_data.rds
+      · notumor_clean_annotated_data.rds
     Generated plots:
-      · (lineage)_(subtype)_dotplot.png
-      · (lineage)_subtype_featureplot.png
-      · (lineage)_subtype_UMAP_cluster.png
+      · DimPlot_UMAP_(groupedby).png
+      · DotPlot_(groupedby).png
           "))

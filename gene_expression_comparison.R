@@ -14,13 +14,13 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_GC_path <- paste0(results_path, "GEMX/GeneComparison/3500/")
+results_GEMX_GC_path <- paste0(results_path, "GEMX/GeneComparison/5500/")
 
 source(paste0(wd, "CA_plots.R"))
 
 # Load  Data
-dwAnnotated <- readRDS(paste0(results_path, "GEMX/CellAnnotation/3500/fully_annotated_data.rds"))
-dwTumoral <- readRDS(paste0(results_path, "GEMX/CellAnnotation/3500/Tumor/tumoral_annotated.rds"))
+dwAnnotated <- readRDS(paste0(results_path, "GEMX/CellAnnotation/5500/fully_annotated_data.rds"))
+dwTumoral <- readRDS(paste0(results_path, "GEMX/CellAnnotation/5500/Tumor/tumoral_annotated.rds"))
 cat("\n Data Loaded \n")
 
 
