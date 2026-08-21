@@ -162,6 +162,7 @@ dwClustered$celltype <- factor(dwClustered$celltype)
 plot_dimplot(dwClustered, reduction = "umap", group_by = "celltype", label = T,
              results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_NoTumor1.png")
 
+# Export Annotated Data
 saveRDS(dwClustered, file.path(results_GEMX_CA_path, "lineage_annotated_data.rds"))
 
 cat(paste("\n ---- FINISHED CELL ANNOTATION ----

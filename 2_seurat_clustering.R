@@ -140,8 +140,6 @@ print('\n Diferential Expression of tumor.markers Performed \n')
 # --- Heatmap to Visualize Cluster  ---
 plot_heatmap(dwIntegrated, results_GEMX_CL_path, tumor_markers_all, n = 10)
 
-rm(dwIntegrated)
-
 cat(paste("\n ---- FINISHED CLUSTERING ----
     Generated files:
       · cells_per_cluster.tsv

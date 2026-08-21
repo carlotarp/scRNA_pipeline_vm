@@ -2,6 +2,7 @@
 ##  Single Cell Analysis Step 3c: inferCNV
 ##
 
+# Load Libraries
 library(dplyr)
 library(Seurat)
 library(SeuratObject)
@@ -14,19 +15,19 @@ setwd(wd)
 results_path <- paste0(project_path, "results/")
 results_GEMX_CNV_path <- paste0(results_path, "GEMX/CellAnnotation/7500/InferCNV/")
 
+# Load Plot Functions
 source(paste0(wd, "CA_plots.R"))
 
 # Load Fully Annotated Data
 dwAnnotated <- readRDS(paste0(results_path, "GEMX/CellAnnotation/7500/notumor_clean_annotated_data.rds"))
 cat("\n Fully annotated data loaded \n")
+gene_order_file <- paste0(project_path, "data/gencode_v19_gene_pos.txt")
+samples <- sort(unique(dwAnnotated$orig.ident))
 
+# Set Reference Celltypes (Leukocytes)
 cat("\n Available celltype values (use these to fill in ref_groups below): \n")
 print(table(dwAnnotated$celltype))
 
-
-# =================================================================
-# MANUAL REFERENCE - edit this list to match your $celltype values exactly
-# =================================================================
 ref_groups <- c(
   "BCell",
   "Tcell_naive",
@@ -38,32 +39,21 @@ ref_groups <- c(
   "Mast"
 )
 
-
-# inferCNV needs raw counts
+# Retrieve Raw Counts
 dwAnnotated <- JoinLayers(dwAnnotated)
 counts_matrix <- GetAssayData(dwAnnotated, assay = "RNA", layer = "counts")
 
-# Reference cells - fixed, same set used in every sample's run
+# Reference cells (All Samples)
 ref_cells <- colnames(dwAnnotated)[dwAnnotated$celltype %in% ref_groups]
+samples <- sort(unique(dwAnnotated$orig.ident))
 
-samples <- sort(unique(as.character(dwAnnotated$orig.ident)))
-cat(paste0("\n Running inferCNV per sample (", length(samples), "): ", paste(samples, collapse = ", "), "\n"))
-
-gene_order_file <- paste0(project_path, "data/gencode_v19_gene_pos.txt")
-
-# =================================================================
-# Run inferCNV once per sample: ALL reference cells (pooled across every
-# sample) vs every NON-reference cell belonging to THIS sample specifically
-# (Tumoral, but also Fibrocyte/Proliferative/anything else not in ref_groups
-# if that sample has them).
-# =================================================================
+# Run InferCNV
 run_infercnv <- function(s){
 
   cat(paste0("\n\n ==== Sample: ", s, " ==== \n"))
   results_sample_path <- paste0(results_GEMX_CNV_path, s, "/")
   dir.create(results_sample_path, recursive = TRUE, showWarnings = FALSE)
 
-#  ref_cells_s <- colnames(dwAnnotated)[dwAnnotated$celltype %in% ref_groups & dwAnnotated$orig.ident == s]
   obs_cells_s <- colnames(dwAnnotated)[!(dwAnnotated$celltype %in% ref_groups) & dwAnnotated$orig.ident == s]
   cells_this_run <- c(obs_cells_s, ref_cells)
 
@@ -83,7 +73,6 @@ run_infercnv <- function(s){
     gene_order_file = gene_order_file,
     ref_group_names = ref_groups,
   )
-
   infercnv_obj_s_run <- infercnv::run(
     infercnv_obj_s,
     cutoff = 0.1,
@@ -95,11 +84,13 @@ run_infercnv <- function(s){
     save_rds = F,
     no_plot = T,
     no_prelim_plot = T,
-    num_threads = 10
+    num_threads = 15
   )
 
   cat(paste0("\n Sample ", s, " done -> ", results_sample_path, "\n"))
 }
+
+# Process InferCNV Output
 process_infercnv <- function(s) {
   cnv_file <- paste0(results_GEMX_CNV_path, s, "/HMM_CNV_predictions.HMMi6.hmm_mode-samples.Pnorm_0.5.pred_cnv_regions.dat")
   group_file <- paste0(results_GEMX_CNV_path, s, "/17_HMM_predHMMi6.hmm_mode-samples.cell_groupings")
@@ -125,41 +116,55 @@ process_infercnv <- function(s) {
   cat("Cell ploidy file gen", s, "\n")
 }
 
+# Execute Pipeline per Sample
+samples <- c("SC7b")
+for (s in samples){
+  run_infercnv(s)
+  process_infercnv(s)
+}
 
-annotate_ploidy <- function (s, object) {
+# Annotate Ploidy Data
+annotate_ploidy <- function (samples, object) {
+  if (!"ploidy" %in% colnames(object@meta.data)) {
+  object$ploidy <- NA
+  }
+  for (s in samples){
+    ploidy_file <- paste0(results_GEMX_CNV_path, s, "_cell_aneuploid_diploid_annotations.txt")
+    ploidy_df <- read.table(ploidy_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
 
-  ploidy_file <- paste0(results_GEMX_CNV_path, s, "_cell_aneuploid_diploid_annotations.txt")
-  ploidy_df <- read.table(ploidy_file, header = TRUE, sep = "\t", stringsAsFactors = FALSE)
+    # Match por barcode - solo actualiza las células de ESTA muestra
+    matched_idx <- match(ploidy_df$cell_id, colnames(object))
+    valid <- !is.na(matched_idx)
 
-  # Match por barcode - solo actualiza las células de ESTA muestra
-  matched_idx <- match(ploidy_df$cell_id, colnames(object))
-  valid <- !is.na(matched_idx)
+    object$ploidy[matched_idx[valid]] <- ploidy_df$ploidy[valid]
 
-  object$ploidy[matched_idx[valid]] <- ploidy_df$ploidy[valid]
-
-  cat(s, ":", sum(valid), "células actualizadas (de", nrow(ploidy_df), "en el archivo)\n")
-
+    cat(s, ":", sum(valid), "células actualizadas (de", nrow(ploidy_df), "en el archivo)\n")
+  }
   return(object)
 }
 
-run_infercnv("SC13")
-process_infercnv("SC13")
-if (!"ploidy" %in% colnames(dwAnnotated@meta.data)) {
-  dwAnnotated$ploidy <- NA
-}
-dwAnnotated <- annotate_ploidy("SC13", dwAnnotated)
+samples
+dwAnnotated <- annotate_ploidy(samples, dwAnnotated)
 dwAnnotated$ploidy <- factor(dwAnnotated$ploidy, levels = c("diploid", "aneuploid"))
 
-# UMAP global coloreado por ploidy
+# --- UMAP by Ploidy ---
 plot_dimplot(dwAnnotated, reduction = "umap", group_by = "ploidy",
-             results_path = results_path, filename = "DimPlot_ploidy.png")
+             results_path = results_GEMX_CNV_path, filename = "DimPlot_ploidy.png")
 
-# Cross-tab: ¿ploidy coincide con lo esperado por celltype?
-# (referencia = diploid, Tumoral = aneuploid; Fibrocyte/Proliferative = lo interesante)
-ploidy_by_celltype <- table(dwAnnotated$celltype[dwAnnotated$orig.ident == "SC13"], dwAnnotated$ploidy[dwAnnotated$orig.ident == "SC13"], useNA = "ifany")
+# Write Tables of Interest
+ploidy_by_celltype <- table(dwAnnotated$celltype, dwAnnotated$ploidy, useNA = "ifany")
 print(ploidy_by_celltype)
 write.csv(as.data.frame.matrix(ploidy_by_celltype), paste0(results_GEMX_CNV_path, "ploidy_by_celltype.csv"))
 
-# % aneuploide dentro de cada celltype - la tabla más directa para leer
-ploidy_pct <- prop.table(ploidy_by_celltype, margin = 1) * 100
-print(round(ploidy_pct, 1))
+
+cat(paste("\n ---- FINISHED InferCNV ----
+    Generated files:
+      · ploidy_by_celltype.csv
+      · (sample)_cell_anaeuploid_diploid_annotations.txt
+      · notumor_annotated_data.rds
+      · notumor_clean_annotated_data.rds
+    Generated plots:
+      · DimPlot_UMAP_(groupedby).png
+      · DotPlot_(groupedby).png
+          "))
+

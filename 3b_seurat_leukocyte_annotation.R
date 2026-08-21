@@ -18,10 +18,10 @@ results_GEMX_LCA_path <- paste0(results_GEMX_CA_path, "Leukocytes/")
 source(paste0(wd, "CA_plots.R"))
 
 # Load lineage Annotated Data
-dwAnnotated <- dwClustered
 dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "lineage_annotated_data.rds"))
 cat("\n lineage-annotated data loaded \n")
 
+# Set Leukocyte Markers
 markers_leukocytes <- list(
   TcellNK = list(
     "Tcell_general"          = c("CD3E", "CD3D"),
@@ -85,7 +85,7 @@ generate_subset <- function(object, results_path) {
                                     s.features = cc.genes.updated.2019$s.genes,
                                     g2m.features = cc.genes.updated.2019$g2m.genes)
   object_subset <- FindVariableFeatures(object_subset)
-  object_subset <- ScaleData(object_subset) #, vars.to.regress = c("S.Score", "G2M.Score"))
+  object_subset <- ScaleData(object_subset)
 
   object_subset <- RunPCA(object_subset)
 
@@ -114,13 +114,10 @@ generate_subset <- function(object, results_path) {
   return(object_subset)
 }
 
-# Execute Functions by Lineage
 dwLeukocytes <- generate_subset(
     object = dwAnnotated,
     results_path = results_GEMX_LCA_path
   )
-
-DimPlot(dwLeukocytes, group.by = "Phase", reduction = "umap")
 
   # --- Dotplot by Subtype ---
 for (subtype in names(markers_leukocytes)){
@@ -182,8 +179,10 @@ dwLeukocytes$celltype <- factor(dwLeukocytes$celltype)
 plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "celltype", label = T,
              results_path = results_GEMX_LCA_path, filename = "DimPlot_UMAP_Leuko_Annotated.png")
 
+# Export Annotated Leukocyte Data
 saveRDS(dwLeukocytes, file.path(results_path, paste0("leukocytes.rds")))
 
+# Perform Label Transfer to the Original Seurat Object
 annotation_vec <- setNames(as.character(dwLeukocytes[["celltype"]][, 1]),
                             colnames(dwLeukocytes))
 
@@ -193,11 +192,7 @@ if ("celltype" %in% colnames(dwAnnotated@meta.data)) {
   existing <- rep(NA_character_, ncol(dwAnnotated))
 }
 names(existing) <- colnames(dwAnnotated)
-
-# Only overwrite the cells present in the subset - everything else (e.g.
-# already-annotated Stromal cells) stays exactly as it was
 existing[names(annotation_vec)] <- annotation_vec
-
 dwAnnotated[["celltype"]] <- factor(existing)
 
 # ---  Visualize Annotated Dimplot ---

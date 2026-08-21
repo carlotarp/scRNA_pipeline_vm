@@ -68,11 +68,13 @@ plot_dimplot(dwTumoral, reduction = "umap", group_by = "PAM50_predicted",
 plot_dimplot(dwTumoral, reduction = "umap", group_by = "seurat_clusters",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_UMAP_CLusters.png")
 
+# Write Table of Interest
 concordance_table <- table(Predicted = dwTumoral$PAM50_predicted, Clinical = dwTumoral$Subtype)
 write.csv(as.data.frame.matrix(concordance_table),
           paste0(results_GEMX_TUMOR_path, "PAM50_vs_Clinical_concordance.csv"))
 cat("\n PAM50 predicted vs clinical Subtype concordance table saved \n")
 
+# --- Visualize Concordance HeatMap ---
 concordance_df <- as.data.frame(concordance_table)
 concordance_df <- concordance_df %>%
   group_by(Predicted) %>%
@@ -90,6 +92,7 @@ p_concordance <- ggplot(concordance_df, aes(x = Clinical, y = Predicted, fill = 
 ggsave(paste0(results_GEMX_TUMOR_path, "Heatmap_PAM50_vs_ClinicalSubtype.png"), p_concordance,
        width = 7, height = 5, dpi = 300, bg = "white")
 
+# --- Visualize Cluster Composition ---
 plot_cluster_composition(dwTumoral, cluster_col = "orig.ident", group_by = "PAM50_predicted",
                          filename = "BarPlot_PAM50Composition_bySample.png", results_path = results_GEMX_TUMOR_path)
 plot_cluster_composition(dwTumoral, cluster_col = "orig.ident", group_by = "Subtype",
@@ -99,34 +102,15 @@ plot_cluster_composition(dwTumoral, group_by = "PAM50_predicted",
 plot_cluster_composition(dwTumoral, group_by = "Subtype",
                          filename = "BarPlot_SubtypeComposition_byCluster.png", results_path = results_GEMX_TUMOR_path)
 
-# Compute PROGENy scores manually - pass a plain matrix (genes x cells) using
-# the Seurat v5 `layer` syntax, bypassing progeny's broken .Seurat method
-# (which still uses the removed `slot` argument internally)
+# Compute PROGENy
 expr_mat <- as.matrix(GetAssayData(dwTumoral, assay = "RNA", layer = "data"))
- 
 progeny_scores <- progeny::progeny(expr_mat, scale = TRUE, organism = "Human", top = 500, perm = 1)
- 
-# progeny()'s matrix method can return either (cells x pathways) or
-# (pathways x cells) depending on version - detect orientation automatically
-# instead of assuming, and transpose so we end up with pathways x cells
-# (what CreateAssayObject expects: features in rows, cells in columns)
-if (nrow(progeny_scores) == ncol(dwTumoral)) {
-  progeny_mat <- t(progeny_scores)   # was cells x pathways -> transpose
-} else {
-  progeny_mat <- progeny_scores      # already pathways x cells
-}
- 
-cat(paste0("\n PROGENy matrix dimensions: ", nrow(progeny_mat), " pathways x ", ncol(progeny_mat), " cells \n"))
- 
 dwTumoral[["progeny"]] <- CreateAssayObject(data = progeny_mat)
- 
-# Scale the progeny assay (standard step before plotting - puts pathways on
-# a comparable, centered scale like z-scores)
 dwTumoral <- ScaleData(dwTumoral, assay = "progeny")
 cat("\n PROGENy pathway activities computed and added as 'progeny' assay \n")
-DefaultAssay(dwTumoral) <- "progeny"
 
 # --- Pathway activity ---
+DefaultAssay(dwTumoral) <- "progeny"
 plot_marker_dotplot(dwTumoral, group_by = "Subtype", marker_groups = rownames(dwTumoral[["progeny"]]),
                     filename = "DotPlot_Progeny_bySubtype.png", results_path = results_GEMX_TUMOR_path)
 plot_marker_dotplot(dwTumoral, group_by = "PAM50_predicted", marker_groups = rownames(dwTumoral[["progeny"]]),
@@ -136,7 +120,7 @@ plot_marker_dotplot(dwTumoral, group_by = "seurat_clusters", marker_groups = row
 DefaultAssay(dwTumoral) <- "RNA"
  
 
-# Compute Cell Cycle Scores (S.Score, G2M.Score, Phase per cell)
+# Compute Cell Cycle Scores
 dwTumoral <- CellCycleScoring(dwTumoral,
                                 s.features = cc.genes.updated.2019$s.genes,
                                 g2m.features = cc.genes.updated.2019$g2m.genes)
@@ -147,6 +131,7 @@ print(table(dwTumoral$Phase))
 plot_dimplot(dwTumoral, reduction = "umap", group_by = "Phase",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_CellCyclePhase.png")
 
+# Write Tables of Interest
 phase_by_pam50 <- table(PAM50 = dwTumoral$PAM50_predicted, Phase = dwTumoral$Phase)
 write.csv(as.data.frame.matrix(phase_by_pam50),
           paste0(results_GEMX_TUMOR_path, "CellCyclePhase_by_PAM50.csv"))
@@ -157,18 +142,8 @@ write.csv(as.data.frame.matrix(phase_by_cluster),
 cat("\n Cell cycle phase tables (by PAM50 and by cluster) saved \n")
 
 
-
-##
-##  Single Cell Analysis Step 6: Differential Scores per Cluster
-##  Spatial-transcriptomics-style "domain marker" analysis, applied to
-##  continuous scores (PROGENy pathways, PAM50 module scores, cell cycle
-##  scores) instead of genes: for each cluster, how much MORE is each score
-##  representing that cluster vs all other clusters combined?
-##
-
-
+# Diferential Cluster Analisys by PROGENy Pathways
 DefaultAssay(dwTumoral) <- "progeny"
-
 progeny_diff <- FindAllMarkers(dwTumoral,
                                  assay = "progeny",
                                  slot = "scale.data",
@@ -177,24 +152,17 @@ progeny_diff <- FindAllMarkers(dwTumoral,
                                  logfc.threshold = 0,   # keep all pathways, not just "big" ones
                                  min.pct = 0)
 
-# Rename for clarity - "avg_log2FC" here is really "avg difference in pathway
-# activity" (scores aren't logFC-like counts, but Seurat's column name sticks)
+# Rename for clarity
 progeny_diff <- progeny_diff %>%
   rename(pathway = gene, avg_diff = avg_log2FC) %>%
   select(cluster, pathway, avg_diff, p_val, p_val_adj, pct.1, pct.2)
 
 write.csv(progeny_diff, paste0(results_GEMX_TUMOR_path, "Differential_PROGENy_byCluster.csv"), row.names = FALSE)
-
 DefaultAssay(dwTumoral) <- "RNA"
-cat("\n [A] Differential PROGENy pathways per cluster done \n")
+cat("\n Differential PROGENy pathways per cluster done \n")
 
 
-# =================================================================
-# B. Generic differential score function - for continuous meta.data columns
-#    that are NOT stored as a Seurat assay (PAM50 module scores, cell cycle
-#    scores). Same logic as FindMarkers (one cluster vs the rest), applied
-#    manually since these live in meta.data, not an assay.
-# =================================================================
+# Differential Score Function
 differential_scores_by_cluster <- function(object, score_cols, group_by = "seurat_clusters") {
   meta <- object@meta.data
   clusters <- sort(unique(as.character(meta[[group_by]])))
@@ -223,55 +191,23 @@ differential_scores_by_cluster <- function(object, score_cols, group_by = "seura
 }
 
 
-# =================================================================
-# C. PAM50 module scores - differential per cluster
-# =================================================================
+
+# Diferential Cluster Analisys by PAM50 Score
 DefaultAssay(dwTumoral) <- "RNA"
 pam50_score_cols <- c("PAM50_Lum", "PAM50_TNBC", "PAM50_Her2+")
 pam50_diff <- differential_scores_by_cluster(dwTumoral, pam50_score_cols)
 write.csv(pam50_diff, paste0(results_GEMX_TUMOR_path, "Differential_PAM50_byCluster.csv"), row.names = FALSE)
-cat("\n [C] Differential PAM50 module scores per cluster done \n")
+cat("\n Differential PAM50 module scores per cluster done \n")
 
 
-# =================================================================
-# D. Cell cycle scores - differential per cluster
-# =================================================================
+
+# Diferential Cluster Analisys by Cell Cycle Score
 cellcycle_score_cols <- c("S.Score", "G2M.Score")
 cellcycle_diff <- differential_scores_by_cluster(dwTumoral, cellcycle_score_cols)
 write.csv(cellcycle_diff, paste0(results_GEMX_TUMOR_path, "Differential_CellCycle_byCluster.csv"), row.names = FALSE)
-cat("\n [D] Differential cell cycle scores per cluster done \n")
+cat("\n Differential cell cycle scores per cluster done \n")
 
-
-# =================================================================
-# E. Combined "dominant layer" summary per cluster - the top-scoring,
-#    most significant feature from EACH layer, one row per cluster
-# =================================================================
-top_per_cluster <- function(diff_df, feature_col, layer_name) {
-  diff_df %>%
-    filter(p_val_adj < 0.05) %>%
-    group_by(cluster) %>%
-    slice_max(order_by = avg_diff, n = 1) %>%
-    ungroup() %>%
-    transmute(cluster, layer = layer_name, dominant_feature = .data[[feature_col]],
-              avg_diff = round(avg_diff, 3), p_val_adj = signif(p_val_adj, 3))
-}
-
-cluster_summary <- bind_rows(
-  top_per_cluster(progeny_diff, "pathway", "PROGENy"),
-  top_per_cluster(pam50_diff, "score", "PAM50"),
-  top_per_cluster(cellcycle_diff, "score", "CellCycle")
-) %>%
-  arrange(cluster, layer)
-
-write.csv(cluster_summary, paste0(results_GEMX_TUMOR_path, "ClusterAnnotation_DominantFeaturePerLayer.csv"), row.names = FALSE)
-cat("\n [E] Combined dominant-feature-per-layer summary saved \n")
-print(cluster_summary)
-
-
-# =================================================================
-# F. Heatmap of PROGENy differential scores by cluster (the main plot for
-#    this kind of "domain annotation" analysis)
-# =================================================================
+# --- Heatmap of PROGENy Differential scores by Cluster ---
 p_progeny_diff <- ggplot(progeny_diff, aes(x = cluster, y = pathway, fill = avg_diff)) +
   geom_tile(color = "white") +
   scale_fill_gradient2(low = "blue", mid = "white", high = "red", midpoint = 0,
@@ -284,10 +220,19 @@ p_progeny_diff <- ggplot(progeny_diff, aes(x = cluster, y = pathway, fill = avg_
 ggsave(paste0(results_GEMX_TUMOR_path, "Heatmap_Differential_PROGENy_byCluster.png"), p_progeny_diff,
        width = 8, height = 6, dpi = 300, bg = "white")
 
+# Manual Cluster Annotation
+clusters_tumor_annotated <- c( #########  7500  #########
+  "0" = "",  "1" = "",
+  "4" = "", "7" = "",
+  "8" = "", "9" = "",
+  "11" = "", "17" = ""
+)
 
-#############
-
+dwTumoral$celltype <- unname(clusters_tumor_annotated[as.character(dwTumoral$seurat_clusters)])
+dwTumoral$celltype <- factor(dwTumoral$celltype)
 dwTumoral$celltype <- factor(dwTumoral$PAM50_predicted)
+
+# Label Transfer
 annotation_vec <- setNames(as.character(dwTumoral[["celltype"]][, 1]),
                             colnames(dwTumoral))
 
@@ -297,18 +242,14 @@ if ("celltype" %in% colnames(dwAnnotated@meta.data)) {
   existing <- rep(NA_character_, ncol(dwAnnotated))
 }
 names(existing) <- colnames(dwAnnotated)
-
-# Only overwrite the cells present in the subset - everything else (e.g.
-# already-annotated Stromal cells) stays exactly as it was
 existing[names(annotation_vec)] <- annotation_vec
-
 dwAnnotated[["celltype"]] <- factor(existing)
 
 # ---  Visualize Annotated Dimplot ---
 plot_dimplot(dwAnnotated, reduction = "umap", group_by = "celltype", label = T,
              results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_Annotated.png")
 
- 
+# Export Annoatated Data
 saveRDS(dwTumoral, file.path(results_GEMX_TUMOR_path, "tumoral_annotated.rds"))
 saveRDS(dwAnnotated, file.path(results_GEMX_CA_path, "fully_annotated_data.rds"))
 cat("\n Tumoral subtypes propagated to global 'celltype' column \n")
