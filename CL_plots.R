@@ -115,6 +115,7 @@ plot_cluster_composition <- function(object, group_by, results_path, filename,
 
   p <- ggplot(df, aes(x = .data[[cluster_col]], y = n, fill = .data[[group_by]])) +
     geom_col() +
+    facet_grid(rows = vars(facet))+
     labs(title = paste0("Cluster composition by ", group_by),
          x = "Cluster", y = "Number of cells") +
     theme_bw() +

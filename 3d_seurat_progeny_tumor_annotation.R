@@ -19,6 +19,9 @@ results_path <- paste0(project_path, "results/")
 results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
 results_GEMX_TUMOR_path <- paste0(results_GEMX_CA_path, "Tumor/")
 
+# Load Plot Functions
+source(paste0(wd, "CA_plots.R"))
+source(paste0(wd, "CL_plots.R"))
 
 # Load Fully Annotated Data
 dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "notumor_clean_annotated_data.rds"))
@@ -102,6 +105,21 @@ plot_cluster_composition(dwTumoral, group_by = "PAM50_predicted",
 plot_cluster_composition(dwTumoral, group_by = "Subtype",
                          filename = "BarPlot_SubtypeComposition_byCluster.png", results_path = results_GEMX_TUMOR_path)
 
+composition_df <- dwTumoral@meta.data %>%
+  group_by(orig.ident, PAM50_predicted, Subtype) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  group_by(orig.ident, Subtype)
+
+p_composition_facet <- ggplot(composition_df, aes(x = orig.ident, y = n, fill = PAM50_predicted)) +
+  geom_col(position = "stack") +
+  facet_wrap(~Subtype, scales = "free_x") +
+  theme_bw() + theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "PAM50 predicted composition per cluster, by clinical subtype",
+       x = "Sample", y = "nº of cells", fill = "PAM50 predicted")
+
+ggsave(paste0(results_GEMX_TUMOR_path, "Composition_PAM50_bySample_facetSubtype.png"), p_composition_facet,
+       width = 12, height = 6, dpi = 300, bg = "white")
+
 # Compute PROGENy
 expr_mat <- as.matrix(GetAssayData(dwTumoral, assay = "RNA", layer = "data"))
 progeny_scores <- progeny::progeny(expr_mat, scale = TRUE, organism = "Human", top = 500, perm = 1)
@@ -130,6 +148,20 @@ print(table(dwTumoral$Phase))
 # --- Cell cycle phase by predicted PAM50 subtype and by cluster ---
 plot_dimplot(dwTumoral, reduction = "umap", group_by = "Phase",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_CellCyclePhase.png")
+
+cellcycle_long <- dwTumoral@meta.data %>%
+  select(seurat_clusters, Subtype, S.Score, G2M.Score) %>%
+  pivot_longer(cols = c(S.Score, G2M.Score), names_to = "score_type", values_to = "score")
+
+p_cellcycle_box <- ggplot(cellcycle_long, aes(x = seurat_clusters, y = score, fill = score_type)) +
+  geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, position = position_dodge(width = 0.8)) +
+  facet_wrap(~Subtype, scales = "free_x") +
+  theme_bw() + theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Cell cycle score distribution by cluster, by clinical subtype",
+       x = "Cluster", y = "Score", fill = "Score type")
+
+ggsave(paste0(results_GEMX_TUMOR_path, "CellCycle_scores_boxplot_byCluster_facetSubtype.png"), p_cellcycle_box,
+       width = 12, height = 6, dpi = 300, bg = "white")
 
 # Write Tables of Interest
 phase_by_pam50 <- table(PAM50 = dwTumoral$PAM50_predicted, Phase = dwTumoral$Phase)
@@ -220,6 +252,35 @@ p_progeny_diff <- ggplot(progeny_diff, aes(x = cluster, y = pathway, fill = avg_
 ggsave(paste0(results_GEMX_TUMOR_path, "Heatmap_Differential_PROGENy_byCluster.png"), p_progeny_diff,
        width = 8, height = 6, dpi = 300, bg = "white")
 
+
+plot_differential_barplot <- function(csv_path, feature_col, title, filename, results_path) {
+  df <- read.csv(csv_path)
+
+  p <- ggplot(df, aes(x = .data[[feature_col]], y = avg_diff, fill = avg_diff)) +
+    geom_col() +
+    facet_wrap(~cluster) +
+    scale_fill_gradient2(low = "firebrick", mid = "white", high = "forestgreen", midpoint = 0,
+                          name = "Diff. vs\nrest") +
+    coord_flip() +
+    theme_bw() + theme(panel.grid = element_blank()) +
+    labs(title = title, x = NULL, y = "avg_diff (cluster vs rest)")
+
+  ggsave(paste0(results_path, filename), p, width = 12, height = 8, dpi = 300, bg = "white")
+}
+
+plot_differential_barplot(paste0(results_GEMX_TUMOR_path, "Differential_PAM50_byCluster.csv"),
+                            "score", "Differential PAM50 module scores by cluster",
+                            "Barplot_Differential_PAM50.png", results_GEMX_TUMOR_path)
+
+plot_differential_barplot(paste0(results_GEMX_TUMOR_path, "Differential_CellCycle_byCluster.csv"),
+                            "score", "Differential cell cycle scores by cluster",
+                            "Barplot_Differential_CellCycle.png", results_GEMX_TUMOR_path)
+
+plot_differential_barplot(paste0(results_GEMX_TUMOR_path, "Differential_PROGENy_byCluster.csv"),
+                            "pathway", "Differential PROGENy pathway activity by cluster",
+                            "Barplot_Differential_PROGENy.png", results_GEMX_TUMOR_path)
+
+
 # Manual Cluster Annotation
 clusters_tumor_annotated <- c( #########  7500  #########
   "0" = "",  "1" = "",
@@ -266,5 +327,4 @@ cat(paste("\n ---- FINISHED TUMOR SUBTYPE ANNOTATION ----
       · Dotplot_PROGENy_(groupedby).png
       · HeatMap_PAM50_vs_ClinicalSubtype.png
           "))
-
 
