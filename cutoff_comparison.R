@@ -185,6 +185,8 @@ plot_transition_tile <- function(df, from_col, to_col, from_label, to_label, res
   ggsave(paste0(results_path, filename), p, width = 8, height = 7, dpi = 300, bg = "white")
 }
 
+
+
 plot_transition_tile(celltype_by_version, "v7500", "v5500", "cutoff 7500", "cutoff 5500",
                       results_COMPARE_path, "Transition_7500_to_5500.png")
 plot_transition_tile(celltype_by_version, "v5500", "v3500", "cutoff 5500", "cutoff 3500",

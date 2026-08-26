@@ -11,13 +11,14 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/")
 
 # Import Plot Functions
 source(paste0(wd, "CA_plots.R"))
 
 # Load Clustered Data
-dwClustered <- readRDS(paste0(results_path, "GEMX/Clustering/7500/clustered_data.rds"))
+dwClustered <- readRDS(paste0(results_path, "GEMX/DecontX/Clustering/clustered_data.rds"))
+dwClustered[["RNA_decontX"]] <- as(dwClustered[["RNA_decontX"]], "Assay5")
 cat("\n Clustered Data Loaded \n")
 
 # Set Markers
@@ -82,85 +83,77 @@ find_markers_for_clusters <- function(object, clusters, results_path, top_n = 20
 clusters_to_check <- c("1", "6", "15", "16") # 3500
 clusters_to_check <- c("7", "15") # 5500
 clusters_to_check <- c("1", "8", "16") # 7500
+clusters_to_check <- c("16", "19", "20") # DecontX 7500
 
 find_markers_for_clusters(dwClustered, clusters_to_check, results_GEMX_CA_path)
 cat("\n Read Ambiguous Cluster CSV (if needed) to complete 'cluster_to_lineage' \n")
 
-
 # Manual Cluster Annotation
-lineage_clusters_annotated <- c( #########  3500  #########
-  "0" = "Tumor", "1" = "Tumor", "2" = "Stromal",
+#lineage_clusters_annotated <- c( #########  3500  #########
+#  "0" = "Tumor", "1" = "Tumor", "2" = "Stromal",
+#  "3" = "Leukocytes", "4" = "Leukocytes", "5" = "Tumor",
+#  "6" = "Tumor", "7" = "Tumor", "8" = "Stromal",
+#  "9" = "Stromal", "10" = "Leukocytes", "11" = "Leukocytes",
+#  "12" = "Stromal", "13" = "Stromal", "14" = "Tumor",
+#  "15" = "Leukocytes", "16" = "Leukocytes", "17" = "Leukocytes",
+#  "18" = "Stromal"
+#)
+
+#lineage_clusters_annotated <- c( #########  5500  #########
+#  "0" = "Tumor", "1" = "Tumor", "2" = "Leukocytes",
+#  "3" = "Stromal", "4" = "Leukocytes", "5" = "Tumor",
+#  "6" = "Stromal", "7" = "Tumor", "8" = "Tumor",
+#  "9" = "Stromal", "10" = "Leukocytes", "11" = "Tumor",
+#  "12" = "Tumor", "13" = "Leukocytes", "14" = "Stromal",
+#  "15" = "Leukocytes", "16" = "Leukocytes", "17" = "Tumor",
+#  "18" = "Tumor"
+#)
+
+# lineage_clusters_annotated <- c( #########  7500  #########
+#  "0" = "Tumor", "1" = "Tumor", "2" = "Leukocytes",
+#  "3" = "Leukocytes", "4" = "Tumor", "5" = "Stromal",
+#  "6" = "Stromal", "7" = "Tumor", "8" = "Tumor",
+#  "9" = "Tumor", "10" = "Stromal", "11" = "Tumor",
+#  "12" = "Stromal", "13" = "Leukocytes", "14" = "Leukocytes",
+#  "15" = "Stromal", "16" = "Leukocytes", "17" = "Tumor",
+#  "18" = "Leukocytes", "19" = "Stromal"
+#)
+
+lineage_clusters_annotated <- c( #########  DecontX 7500  #########
+  "0" = "Tumor", "1" = "Stromal", "2" = "Tumor",
   "3" = "Leukocytes", "4" = "Leukocytes", "5" = "Tumor",
-  "6" = "Tumor", "7" = "Tumor", "8" = "Stromal",
-  "9" = "Stromal", "10" = "Leukocytes", "11" = "Leukocytes",
-  "12" = "Stromal", "13" = "Stromal", "14" = "Tumor",
-  "15" = "Leukocytes", "16" = "Leukocytes", "17" = "Leukocytes",
-  "18" = "Stromal"
+  "6" = "Tumor", "7" = "Stromal", "8" = "Tumor",
+  "9" = "Leukocytes", "10" = "Leukocytes", "11" = "Stromal",
+  "12" = "Stromal", "13" = "Tumor", "14" = "Leukocytes",
+  "15" = "Leukocytes", "16" = "Leukocytes", "17" = "Stromal",
+  "18" = "Tumor", "19" = "Tumor", "20" = "Tumor",
+  "21" = "Tumor", "22" = "Tumor"
 )
 
-lineage_clusters_annotated <- c( #########  5500  #########
-  "0" = "Tumor", "1" = "Tumor", "2" = "Leukocytes",
-  "3" = "Stromal", "4" = "Leukocytes", "5" = "Tumor",
-  "6" = "Stromal", "7" = "Tumor", "8" = "Tumor",
-  "9" = "Stromal", "10" = "Leukocytes", "11" = "Tumor",
-  "12" = "Tumor", "13" = "Leukocytes", "14" = "Stromal",
-  "15" = "Leukocytes", "16" = "Leukocytes", "17" = "Tumor",
-  "18" = "Tumor"
-)
-
-lineage_clusters_annotated <- c( #########  7500  #########
-  "0" = "Tumor", "1" = "Tumor", "2" = "Leukocytes",
-  "3" = "Leukocytes", "4" = "Tumor", "5" = "Stromal",
-  "6" = "Stromal", "7" = "Tumor", "8" = "Tumor",
-  "9" = "Tumor", "10" = "Stromal", "11" = "Tumor",
-  "12" = "Stromal", "13" = "Leukocytes", "14" = "Leukocytes",
-  "15" = "Stromal", "16" = "Leukocytes", "17" = "Tumor",
-  "18" = "Leukocytes", "19" = "Stromal"
-)
-
-dwClustered$lineage <- unname(lineage_clusters_annotated[as.character(dwClustered$seurat_clusters)])
+dwClustered$lineage <- unname(lineage_clusters_annotated[as.character(dwClustered$decontX_clusters)])
 dwClustered$lineage <- factor(dwClustered$lineage)
 
-# ---  lineage Annotated Dimplot ---
-plot_dimplot(dwClustered, reduction = "umap", group_by = "lineage",
+# ---  Lineage Annotated Dimplot ---
+plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "lineage",
              results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_Lineage.png")
 
-subtype_clusters_annotated <- c( #########  3500  #########
-  "0" = "Tumor", "1" = "Tumor", "2" = "Fibroblast // CAF",
-  "3" = "TCell // NK", "4" = "Myeloid", "5" = "Tumor",
-  "6" = "Tumor", "7" = "Tumor", "8" = "Fibroblast // CAF",
-  "9" = "Endothelial", "10" = "BCell", "11" = "PlasmaBlast",
-  "12" = "cCAF", "13" = "Fibroblast // CAF // Pericyte", "14" = "Tumor",
-  "15" = "Mast", "16" = "Proliferative", "17" = "DC",
-  "18" = "Adipocyte"
-)
-
-subtype_clusters_annotated <- c( #########  5500  #########
-  "0" = "Tumor", "1" = "Tumor", "2" = "TCell",
-  "3" = "Fibroblast // CAF // Pericyte", "4" = "Myeloid", "5" = "Tumor",
-  "6" = "Fibroblast // CAF", "7" = "Tumor", "8" = "Tumor",
-  "9" = "Endothelial", "10" = "BCell", "11" = "Tumor",
-  "12" = "Tumor", "13" = "PlasmaBlast", "14" = "cCAF",
-  "15" = "Proliferative", "16" = "Mast", "17" = "Tumor",
-  "18" = "Tumor"
-)
-
-subtype_clusters_annotated <- c( #########  7500  #########
-  "0" = "Tumor", "1" = "Tumor", "2" = "TCell // NK",
-  "3" = "Myeloid", "4" = "Tumor", "5" = "Fibroblast // CAF",
-  "6" = "Fibroblast // CAF", "7" = "Tumor", "8" = "Tumor",
-  "9" = "Tumor", "10" = "Fibroblast // CAF", "11" = "Tumor",
-  "12" = "Endothelial", "13" = "BCell", "14" = "PlasmaBlast",
-  "15" = "cCAF", "16" = "Proliferative", "17" = "Tumor",
-  "18" = "Mast", "19" = "Fibroblast // CAF // Pericyte"
-)
-
-dwClustered$celltype <- unname(subtype_clusters_annotated[as.character(dwClustered$seurat_clusters)])
+# Create Extra Col for Celltype Annotation
+dwClustered$celltype <- unname(lineage_clusters_annotated[as.character(dwClustered$decontX_clusters)])
 dwClustered$celltype <- factor(dwClustered$celltype)
 
-# ---  Stromal Annotated Dimplot ---
-plot_dimplot(dwClustered, reduction = "umap", group_by = "celltype", label = T,
-             results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_NoTumor1.png")
+# Add Contaminated Data
+dwContaminated <- readRDS(file.path(results_path, "GEMX/CellAnnotation/7500/notumor_annotated_data.rds"))
+dwClustered$clusters_cont <- dwContaminated$seurat_clusters
+dwClustered$celltype_cont <- dwContaminated$celltype
+
+# --- Dimplots to Compare Cluster and Celltype Distribution
+plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "celltype_cont", label = T,
+             results_path = results_GEMX_CA_path, filename = "UMAP_decontX_byContCelltype.png")
+plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "clusters_cont", label = T,
+             results_path = results_GEMX_CA_path, filename = "UMAP_decontX_byContClusters.png")
+plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "decontX_clusters", label = T,
+             results_path = results_GEMX_CA_path, filename = "UMAP_decontX_byDecontClusters.png")
+
 
 # Export Annotated Data
 saveRDS(dwClustered, file.path(results_GEMX_CA_path, "lineage_annotated_data.rds"))

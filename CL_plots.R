@@ -14,7 +14,7 @@ library(htmlwidgets)
 # Elbow plot with the chosen number of PCs (co3) marked
 # ---------------------------------------------------------------
 plot_elbow <- function(object, co3, results_path) {
-  p <- ElbowPlot(object, ndims = length(object[["pca"]]@stdev)) +
+  p <- ElbowPlot(object, ndims = length(object[["pca_decontX"]]@stdev)) +
     geom_vline(xintercept = co3, linetype = "dashed", color = "red") +
     ggtitle(paste0("Elbow plot (chosen PCs = ", co3, ")")) +
     theme_bw()
@@ -64,7 +64,7 @@ plot_resolution_grid <- function(object, results_path,
     current_clusters <- Idents(object)
     n_clusters <- length(unique(current_clusters))
 
-    p <- DimPlot(object, reduction = "umap", label = TRUE) +
+    p <- DimPlot(object, reduction = "umap_decontX", label = TRUE) +
       ggtitle(paste0("resolution = ", res, "  (", n_clusters, " clusters)")) +
       theme(legend.position = "none")
     plot_list[[as.character(res)]] <- p
@@ -115,7 +115,6 @@ plot_cluster_composition <- function(object, group_by, results_path, filename,
 
   p <- ggplot(df, aes(x = .data[[cluster_col]], y = n, fill = .data[[group_by]])) +
     geom_col() +
-    facet_grid(rows = vars(facet))+
     labs(title = paste0("Cluster composition by ", group_by),
          x = "Cluster", y = "Number of cells") +
     theme_bw() +

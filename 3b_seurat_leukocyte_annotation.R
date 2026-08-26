@@ -11,7 +11,7 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/")
 results_GEMX_LCA_path <- paste0(results_GEMX_CA_path, "Leukocytes/")
 
 # Import Plot Functions
@@ -80,10 +80,8 @@ markers_leukocytes <- list(
 # Generate Subsets
 generate_subset <- function(object, results_path) {
   object_subset <- subset(object, subset = lineage == "Leukocytes")
+  object_subset[["RNA_decontX"]] <- split(object_subset[["RNA_decontX"]], f = object_subset$orig.ident)
   object_subset <- NormalizeData(object_subset)
-  object_subset <- CellCycleScoring(object_subset,
-                                    s.features = cc.genes.updated.2019$s.genes,
-                                    g2m.features = cc.genes.updated.2019$g2m.genes)
   object_subset <- FindVariableFeatures(object_subset)
   object_subset <- ScaleData(object_subset)
 
@@ -105,7 +103,18 @@ generate_subset <- function(object, results_path) {
   object_subset <- RunUMAP(object_subset, reduction = "harmony", dims = 1:co3_subset) # reduction = "harmony"
   object_subset <- FindClusters(object_subset, resolution = 0.4)
   object_subset <- JoinLayers(object_subset)
+  # 1. ¿Se creó seurat_clusters?
+  "seurat_clusters" %in% colnames(object_subset@meta.data)
+  table(object_subset$seurat_clusters, useNA = "ifany")
 
+  # 2. ¿co3_subset dio un valor válido, o NA?
+  co3_subset
+
+  # 3. ¿Cuántas células tiene el subset en total?
+  ncol(object_subset)
+
+  # 4. ¿Existe la reducción "umap"?
+  names(object_subset@reductions)
   # --- Visualize UMAP ---
   plot_dimplot(object_subset, reduction = "umap", group_by = "seurat_clusters",
                results_path = results_path,
@@ -143,33 +152,42 @@ find_markers_for_clusters <- function(object, clusters, results_path, top_n = 20
 clusters_to_check <- c("5", "7", "8") # 3500
 clusters_to_check <- c("4", "8") # 5500
 clusters_to_check <- c("5", "10") # 7500
+clusters_to_check <- c("10", "11") # DecontX 7500
 
 find_markers_for_clusters(dwLeukocytes, clusters_to_check, results_GEMX_LCA_path)
 cat("\n Read Ambiguous Cluster CSV (if needed) to complete the annotation \n")
 
 # Manual Subtype Annotation
-clusters_leuko_annotated <- c( #########  3500  #########
-  "0" = "DC // TAM",  "1" = "TCell_naive",  "2" = "BCell",
-  "3" = "TCell_cyto",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
-  "6" = "TCell_ex",  "7" = "DC",  "8" = "Prolifetarive",
-  "9" = "Mast",  "10" = "pDC",  "11" = "PlasmaBlast",
-  "12" = "actDC",  "13" = "PlasmaBlast"
-)
+#clusters_leuko_annotated <- c( #########  3500  #########
+#  "0" = "DC // TAM",  "1" = "TCell_naive",  "2" = "BCell",
+#  "3" = "TCell_cyto",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
+#  "6" = "TCell_ex",  "7" = "DC",  "8" = "Prolifetarive",
+#  "9" = "Mast",  "10" = "pDC",  "11" = "PlasmaBlast",
+#  "12" = "actDC",  "13" = "PlasmaBlast"
+#)
 
-clusters_leuko_annotated <- c( #########  5500  #########
-  "0" = "pDC",  "1" = "Tcell",  "2" = "BCell",
-  "3" = "Tcell_naive",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
-  "6" = "Tcell_ex",  "7" = "pDC",  "8" = "Proliferative",
-  "9" = "Mast",  "10" = "TAM // Monocyte",  "11" = "pDC",
-  "12" = "PlasmaBlast",  "13" = "actDC" , "14" = "PlasmaBlast"
-)
+#clusters_leuko_annotated <- c( #########  5500  #########
+#  "0" = "pDC",  "1" = "Tcell",  "2" = "BCell",
+#  "3" = "Tcell_naive",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
+#  "6" = "Tcell_ex",  "7" = "pDC",  "8" = "Proliferative",
+#  "9" = "Mast",  "10" = "TAM // Monocyte",  "11" = "pDC",
+#  "12" = "PlasmaBlast",  "13" = "actDC" , "14" = "PlasmaBlast"
+#)
 
-clusters_leuko_annotated <- c( #########  7500  #########
-  "0" = "pDC",  "1" = "Tcell_cyto",  "2" = "BCell",
-  "3" = "Tcell_naive",  "4" = "PlasmaBlast",  "5" = "Tcell_ex",
-  "6" = "Fibrocyte",  "7" = "pDC",  "8" = "Proliferative",
-  "9" = "Mast",  "10" = "pDC",  "11" = "actDC",
-  "12" = "PlasmaBlast"
+#clusters_leuko_annotated <- c( #########  7500  #########
+#  "0" = "pDC",  "1" = "Tcell_cyto",  "2" = "BCell",
+#  "3" = "Tcell_naive",  "4" = "PlasmaBlast",  "5" = "Tcell_ex",
+#  "6" = "Fibrocyte",  "7" = "pDC",  "8" = "Proliferative",
+#  "9" = "Mast",  "10" = "pDC",  "11" = "actDC",
+#  "12" = "PlasmaBlast"
+#)
+
+clusters_leuko_annotated <- c( #########  DecontX 7500  #########
+  "0" = "TAM",  "1" = "TCell_cyto",  "2" = "BCell",
+  "3" = "TCell_naive",  "4" = "PlasmaBlast",  "5" = "TCell_ex",
+  "6" = "cDC",  "7" = "TAM_fibro",  "8" = "Mast",
+  "9" = "pDC",  "10" = "Proliferative",  "11" = "TAM_proInflamm",
+  "12" = "actDC", "13" = "PlasmaBlast"
 )
 
 dwLeukocytes$celltype <- unname(clusters_leuko_annotated[as.character(dwLeukocytes$seurat_clusters)])
@@ -178,6 +196,10 @@ dwLeukocytes$celltype <- factor(dwLeukocytes$celltype)
 # ---  Visualize Annotated Dimplot ---
 plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "celltype", label = T,
              results_path = results_GEMX_LCA_path, filename = "DimPlot_UMAP_Leuko_Annotated.png")
+
+# -- DimPlot to Compare Contaminated vs Decontaminated
+plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "celltype_cont", label = T,
+             results_path = results_GEMX_LCA_path, filename = "DimPlot_UMAP_LeukoContaminated.png")
 
 # Export Annotated Leukocyte Data
 saveRDS(dwLeukocytes, file.path(results_path, paste0("leukocytes.rds")))
@@ -196,20 +218,16 @@ existing[names(annotation_vec)] <- annotation_vec
 dwAnnotated[["celltype"]] <- factor(existing)
 
 # ---  Visualize Annotated Dimplot ---
-plot_dimplot(dwAnnotated, reduction = "umap", group_by = "celltype", label = T,
-             results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_NoTumor2.png")
+plot_dimplot(dwAnnotated, reduction = "umap_decontX", group_by = "celltype", label = T,
+             results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_Leuko.png")
 
 # Export Annotated Data
-saveRDS(dwAnnotated, file.path(results_GEMX_CA_path, "notumor_annotated_data.rds"))
-
-# Export Clean Annotated Data
-saveRDS(subset(dwAnnotated, subset = celltype != "Fibrocyte"), file.path(results_GEMX_CA_path, "notumor_clean_annotated_data.rds"))
+saveRDS(dwAnnotated, file.path(results_GEMX_CA_path, "leuko_annotated_data.rds"))
 
 cat(paste("\n ---- FINISHED LEUKOCYTE ANNOTATION ----
     Generated files:
       · leukocytes.rds
-      · notumor_annotated_data.rds
-      · notumor_clean_annotated_data.rds
+      · leukocytes_annotated_data.rds
     Generated plots:
       · DimPlot_UMAP_(groupedby).png
       · DotPlot_(groupedby).png

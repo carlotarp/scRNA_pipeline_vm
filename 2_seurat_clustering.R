@@ -13,7 +13,7 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CL_path <- paste0(results_path, "GEMX/Clustering/7500/")
+results_GEMX_CL_path <- paste0(results_path, "GEMX/DecontX/Clustering/")
 
 # Import Plot Functions
 source(paste0(wd, "CL_plots.R"))
@@ -23,7 +23,7 @@ dwIntegrated <- readRDS(paste0(results_path, "GEMX/QualityControl/7500/sample_an
 cat(" Annotated Sample Data Loaded \n")
 
 # Find Optimal Number of PCs
-pct <- dwIntegrated[["pca"]]@stdev / sum(dwIntegrated[["pca"]]@stdev) * 100
+pct <- dwIntegrated[["pca_decontX"]]@stdev / sum(dwIntegrated[["pca_decontX"]]@stdev) * 100
 cumu <- cumsum(pct)
 co1 <- which(cumu > 90 & pct < 5)[1]
 co2 <- sort(which((pct[1:length(pct) - 1] - pct[2:length(pct)]) > 0.1), decreasing = TRUE)[1] + 1
@@ -34,43 +34,43 @@ cat(paste("\n The Optimal number of PCs is", co3, "\n")) # 12
 plot_elbow(dwIntegrated, co3, results_GEMX_CL_path)
 
 # Generate UMAP
-dwIntegrated <- RunUMAP(dwIntegrated, reduction = "harmony", dims = 1:co3)
+dwIntegrated <- RunUMAP(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3, reduction.name = "umap_decontX")
 cat("\n UMAP Generated \n")
 
 # Find Optimal Resolution for Clustering (visually)
-dwIntegrated <- FindNeighbors(dwIntegrated, reduction = "harmony", dims = 1:co3)
+dwIntegrated <- FindNeighbors(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3)
 plot_resolution_grid(dwIntegrated, results_path = results_GEMX_CL_path,
-                          reduction = "harmony",
-                          resolutions = c(0.2, 0.4, 0.6, 0.8, 1.0))
-res <- 0.6
+                          reduction = "harmony_decontX",
+                          resolutions = c(0.2, 0.3, 0.4, 0.5))
+res <- 0.5
 cat(paste("\n The Optimal Resolution is", res, "\n"))
 
 # Generate Clusters
-dwIntegrated <- FindClusters(dwIntegrated, resolution = res)
+dwIntegrated <- FindClusters(dwIntegrated, resolution = res, cluster.name = "decontX_clusters")
 cat("\n Clusters Generated w/ Optimal Resolution \n")
 
 
 # ---  Visualize Integrated PCA ---
-plot_dimplot(dwIntegrated, reduction = "harmony", group_by = "Subtype",
+plot_dimplot(dwIntegrated, reduction = "harmony_decontX", group_by = "Subtype",
              results_path = results_GEMX_CL_path, filename = "DimPlot_PCA_bySubtype.png")
-plot_dimplot(dwIntegrated, reduction = "harmony", group_by = "seurat_clusters", label = T,
+plot_dimplot(dwIntegrated, reduction = "harmony_decontX", group_by = "seurat_clusters", label = T,
              results_path = results_GEMX_CL_path, filename = "DimPlot_PCA_byCluster.png")
-plot_featureplot(dwIntegrated, reduction = "harmony", features = "PTPRC",
+plot_featureplot(dwIntegrated, reduction = "harmony_decontX", features = "PTPRC",
                   results_path = results_GEMX_CL_path, filename = "FeaturePlot_PCA_CD45.png")
 
 # --- Visualize UMAP ---
-plot_dimplot(dwIntegrated, reduction = "umap", group_by = "Subtype",
+plot_dimplot(dwIntegrated, reduction = "umap_decontX", group_by = "Subtype",
              results_path = results_GEMX_CL_path, filename = "DimPlot_UMAP_bySubtype.png")
-plot_dimplot(dwIntegrated, reduction = "umap", group_by = "seurat_clusters", label = T,
+plot_dimplot(dwIntegrated, reduction = "umap_decontX", group_by = "seurat_clusters", label = T,
              results_path = results_GEMX_CL_path, filename = "DimPlot_UMAP_byCluster.png")
-plot_featureplot(dwIntegrated, reduction = "umap", features = "PTPRC",
+plot_featureplot(dwIntegrated, reduction = "umap_decontX", features = "PTPRC",
                   results_path = results_GEMX_CL_path, filename = "FeaturePlot_UMAP_CD45.png")
 
 # Generate Tables of Interest
 cells_clusters <- table(dwIntegrated@meta.data$seurat_clusters, dwIntegrated@meta.data$orig.ident)
 cells_clusters <- cbind(cells_clusters,row.names(cells_clusters))
 write.table(cells_clusters,file=paste0(results_GEMX_CL_path,'cells_per_cluster.tsv'),sep="\t",row.names = FALSE, col.names = TRUE)
-write.table(dwIntegrated@reductions[["umap"]]@cell.embeddings,file=paste0(results_GEMX_CL_path,'umap_pvalues.tsv'),sep="\t",row.names = TRUE, col.names = TRUE)
+write.table(dwIntegrated@reductions[["umap_decontX"]]@cell.embeddings,file=paste0(results_GEMX_CL_path,'umap_pvalues.tsv'),sep="\t",row.names = TRUE, col.names = TRUE)
 write.table(dwIntegrated@meta.data,file=paste0(results_GEMX_CL_path,'clustered_metadata.tsv'),sep="\t",row.names = TRUE, col.names = TRUE)
 cat("\n Tables of Interest Writen \n")
 

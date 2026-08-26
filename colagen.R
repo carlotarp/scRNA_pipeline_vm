@@ -282,7 +282,6 @@ dwAnnotated_joined <- RunUMAP(dwAnnotated_joined, reduction = "harmony_decontX",
 table(dwAnnotated_joined$seurat_clusters)
 table(dwAnnotated_joined$decontX_clusters)
 
-# ¿Sigue existiendo Fibrocyte como cluster distinto tras la corrección?
 source(paste0(wd, "CA_plots.R"))
 plot_dimplot(dwAnnotated_joined, reduction = "umap_decontX", group_by = "celltype",
              results_path = results_GEMX_CC_path, filename = "UMAP_decontX_byCelltype.png")

@@ -16,7 +16,7 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/CellAnnotation/7500/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/")
 results_GEMX_TUMOR_path <- paste0(results_GEMX_CA_path, "Tumor/")
 
 # Load Plot Functions
@@ -24,10 +24,9 @@ source(paste0(wd, "CA_plots.R"))
 source(paste0(wd, "CL_plots.R"))
 
 # Load Fully Annotated Data
-dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "notumor_clean_annotated_data.rds"))
+dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "notumor_annotated_data.rds"))
 cat("\n Fully annotated data loaded \n")
 
-dwAnnotated <- readRDS(file.path(results_GEMX_CA_path, "fully_annotated_data.rds"))
 
 # Subset Tumors
 dwTumoral <- subset(dwAnnotated, subset = lineage == "Tumor")
@@ -44,7 +43,7 @@ pam50_genes <- list(
 plot_marker_dotplot(dwTumoral, marker_groups = pam50_genes,
                      results_path = results_GEMX_TUMOR_path,
                      filename = paste0("Dotplot_PAM50.png"),
-                     group_by = "seurat_clusters")
+                     group_by = "decontX_clusters")
 
 # Compute PAM50 Module Scores
 dwTumoral <- AddModuleScore(dwTumoral, features = pam50_genes, name = "PAM50_")
@@ -64,12 +63,14 @@ cat("\n PAM50 module scores computed \n")
 print(table(dwTumoral$PAM50_predicted))
 
 # --- Validation: compare predicted subtype vs clinical Subtype annotation ---
-plot_dimplot(dwTumoral, reduction = "umap", group_by = "Subtype",
+plot_dimplot(dwTumoral, reduction = "umap_decontX", group_by = "Subtype",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_UMAP_Clinical.png")
-plot_dimplot(dwTumoral, reduction = "umap", group_by = "PAM50_predicted",
+plot_dimplot(dwTumoral, reduction = "umap_decontX", group_by = "PAM50_predicted",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_UMAP_PAM50.png")
-plot_dimplot(dwTumoral, reduction = "umap", group_by = "seurat_clusters",
+plot_dimplot(dwTumoral, reduction = "umap_decontX", group_by = "decontX_clusters",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_UMAP_CLusters.png")
+plot_dimplot(subset(dwTumoral, subset = dwTumoral$celltype_cont %in% c("Lum", "TNBC", "Her2+")), reduction = "umap_decontX", group_by = "celltype_cont",
+             results_path = results_GEMX_TUMOR_path, filename = "DimPlot_UMAP_ContPAM50.png")
 
 # Write Table of Interest
 concordance_table <- table(Predicted = dwTumoral$PAM50_predicted, Clinical = dwTumoral$Subtype)
@@ -100,9 +101,9 @@ plot_cluster_composition(dwTumoral, cluster_col = "orig.ident", group_by = "PAM5
                          filename = "BarPlot_PAM50Composition_bySample.png", results_path = results_GEMX_TUMOR_path)
 plot_cluster_composition(dwTumoral, cluster_col = "orig.ident", group_by = "Subtype",
                          filename = "BarPlot_SubtypeComposition_bySample.png", results_path = results_GEMX_TUMOR_path)
-plot_cluster_composition(dwTumoral, group_by = "PAM50_predicted",
+plot_cluster_composition(dwTumoral, cluster_col = "decontX_clusters", group_by = "PAM50_predicted",
                          filename = "BarPlot_PAM50Composition_byCluster.png", results_path = results_GEMX_TUMOR_path)
-plot_cluster_composition(dwTumoral, group_by = "Subtype",
+plot_cluster_composition(dwTumoral, cluster_col = "decontX_clusters", group_by = "Subtype",
                          filename = "BarPlot_SubtypeComposition_byCluster.png", results_path = results_GEMX_TUMOR_path)
 
 composition_df <- dwTumoral@meta.data %>%
@@ -121,9 +122,9 @@ ggsave(paste0(results_GEMX_TUMOR_path, "Composition_PAM50_bySample_facetSubtype.
        width = 12, height = 6, dpi = 300, bg = "white")
 
 # Compute PROGENy
-expr_mat <- as.matrix(GetAssayData(dwTumoral, assay = "RNA", layer = "data"))
+expr_mat <- as.matrix(GetAssayData(dwTumoral, assay = "RNA_decontX", layer = "data"))
 progeny_scores <- progeny::progeny(expr_mat, scale = TRUE, organism = "Human", top = 500, perm = 1)
-dwTumoral[["progeny"]] <- CreateAssayObject(data = progeny_mat)
+dwTumoral[["progeny"]] <- CreateAssayObject(data = t(progeny_scores))
 dwTumoral <- ScaleData(dwTumoral, assay = "progeny")
 cat("\n PROGENy pathway activities computed and added as 'progeny' assay \n")
 
@@ -133,9 +134,9 @@ plot_marker_dotplot(dwTumoral, group_by = "Subtype", marker_groups = rownames(dw
                     filename = "DotPlot_Progeny_bySubtype.png", results_path = results_GEMX_TUMOR_path)
 plot_marker_dotplot(dwTumoral, group_by = "PAM50_predicted", marker_groups = rownames(dwTumoral[["progeny"]]),
                     filename = "DotPlot_Progeny_byPAM50.png", results_path = results_GEMX_TUMOR_path)
-plot_marker_dotplot(dwTumoral, group_by = "seurat_clusters", marker_groups = rownames(dwTumoral[["progeny"]]),
+plot_marker_dotplot(dwTumoral, group_by = "decontX_clusters", marker_groups = rownames(dwTumoral[["progeny"]]),
                     filename = "DotPlot_Progeny_byCluster.png", results_path = results_GEMX_TUMOR_path)
-DefaultAssay(dwTumoral) <- "RNA"
+DefaultAssay(dwTumoral) <- "RNA_decontX"
  
 
 # Compute Cell Cycle Scores
@@ -146,14 +147,14 @@ cat("\n Cell cycle scores computed \n")
 print(table(dwTumoral$Phase))
 
 # --- Cell cycle phase by predicted PAM50 subtype and by cluster ---
-plot_dimplot(dwTumoral, reduction = "umap", group_by = "Phase",
+plot_dimplot(dwTumoral, reduction = "umap_decontX", group_by = "Phase",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_CellCyclePhase.png")
 
 cellcycle_long <- dwTumoral@meta.data %>%
-  select(seurat_clusters, Subtype, S.Score, G2M.Score) %>%
+  select(decontX_clusters, Subtype, S.Score, G2M.Score) %>%
   pivot_longer(cols = c(S.Score, G2M.Score), names_to = "score_type", values_to = "score")
 
-p_cellcycle_box <- ggplot(cellcycle_long, aes(x = seurat_clusters, y = score, fill = score_type)) +
+p_cellcycle_box <- ggplot(cellcycle_long, aes(x = decontX_clusters, y = score, fill = score_type)) +
   geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, position = position_dodge(width = 0.8)) +
   facet_wrap(~Subtype, scales = "free_x") +
   theme_bw() + theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
@@ -168,7 +169,7 @@ phase_by_pam50 <- table(PAM50 = dwTumoral$PAM50_predicted, Phase = dwTumoral$Pha
 write.csv(as.data.frame.matrix(phase_by_pam50),
           paste0(results_GEMX_TUMOR_path, "CellCyclePhase_by_PAM50.csv"))
 
-phase_by_cluster <- table(Cluster = dwTumoral$seurat_clusters, Phase = dwTumoral$Phase)
+phase_by_cluster <- table(Cluster = dwTumoral$decontX_clusters, Phase = dwTumoral$Phase)
 write.csv(as.data.frame.matrix(phase_by_cluster),
           paste0(results_GEMX_TUMOR_path, "CellCyclePhase_by_cluster.csv"))
 cat("\n Cell cycle phase tables (by PAM50 and by cluster) saved \n")
@@ -179,23 +180,23 @@ DefaultAssay(dwTumoral) <- "progeny"
 progeny_diff <- FindAllMarkers(dwTumoral,
                                  assay = "progeny",
                                  slot = "scale.data",
-                                 group.by = "seurat_clusters",
+                                 group.by = "decontX_clusters",
                                  test.use = "wilcox",
                                  logfc.threshold = 0,   # keep all pathways, not just "big" ones
                                  min.pct = 0)
 
 # Rename for clarity
 progeny_diff <- progeny_diff %>%
-  rename(pathway = gene, avg_diff = avg_log2FC) %>%
-  select(cluster, pathway, avg_diff, p_val, p_val_adj, pct.1, pct.2)
+  dplyr::rename(pathway = gene, avg_diff = avg_log2FC) %>%
+  dplyr::select(cluster, pathway, avg_diff, p_val, p_val_adj, pct.1, pct.2)
 
 write.csv(progeny_diff, paste0(results_GEMX_TUMOR_path, "Differential_PROGENy_byCluster.csv"), row.names = FALSE)
-DefaultAssay(dwTumoral) <- "RNA"
+DefaultAssay(dwTumoral) <- "RNA_decontX"
 cat("\n Differential PROGENy pathways per cluster done \n")
 
 
 # Differential Score Function
-differential_scores_by_cluster <- function(object, score_cols, group_by = "seurat_clusters") {
+differential_scores_by_cluster <- function(object, score_cols, group_by = "decontX_clusters") {
   meta <- object@meta.data
   clusters <- sort(unique(as.character(meta[[group_by]])))
 
@@ -225,7 +226,7 @@ differential_scores_by_cluster <- function(object, score_cols, group_by = "seura
 
 
 # Diferential Cluster Analisys by PAM50 Score
-DefaultAssay(dwTumoral) <- "RNA"
+DefaultAssay(dwTumoral) <- "RNA_decontX"
 pam50_score_cols <- c("PAM50_Lum", "PAM50_TNBC", "PAM50_Her2+")
 pam50_diff <- differential_scores_by_cluster(dwTumoral, pam50_score_cols)
 write.csv(pam50_diff, paste0(results_GEMX_TUMOR_path, "Differential_PAM50_byCluster.csv"), row.names = FALSE)
@@ -289,7 +290,11 @@ clusters_tumor_annotated <- c( #########  7500  #########
   "11" = "", "17" = ""
 )
 
-dwTumoral$celltype <- unname(clusters_tumor_annotated[as.character(dwTumoral$seurat_clusters)])
+
+dwTumoral$celltype <- dwTumoral$PAM50_predicted
+
+
+dwTumoral$celltype <- unname(clusters_tumor_annotated[as.character(dwTumoral$decontX_clusters)])
 dwTumoral$celltype <- factor(dwTumoral$celltype)
 dwTumoral$celltype <- factor(dwTumoral$PAM50_predicted)
 
@@ -307,7 +312,7 @@ existing[names(annotation_vec)] <- annotation_vec
 dwAnnotated[["celltype"]] <- factor(existing)
 
 # ---  Visualize Annotated Dimplot ---
-plot_dimplot(dwAnnotated, reduction = "umap", group_by = "celltype", label = T,
+plot_dimplot(dwAnnotated, reduction = "umap_decontX", group_by = "celltype", label = T,
              results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_Annotated.png")
 
 # Export Annoatated Data
@@ -328,3 +333,46 @@ cat(paste("\n ---- FINISHED TUMOR SUBTYPE ANNOTATION ----
       · HeatMap_PAM50_vs_ClinicalSubtype.png
           "))
 
+
+
+transition_df <- data.frame(
+  cell = colnames(dwAnnotated),
+  celltype_before = as.character(dwAnnotated$celltype_cont),
+  celltype_after = as.character(dwAnnotated$celltype)
+)
+
+cat("Total células:", nrow(transition_df), "\n")
+cat("NA en 'before':", sum(is.na(transition_df$celltype_before)), "\n")
+cat("NA en 'after':", sum(is.na(transition_df$celltype_after)), "\n")
+
+r
+
+# =================================================================
+# Tileplot de transición en % (normalizado por fila - "before")
+# =================================================================
+
+transition_df <- data.frame(
+  cell = colnames(object),
+  celltype_before = as.character(object$celltype_cont),
+  celltype_after = as.character(object$celltype)
+)
+
+trans_counts <- transition_df %>%
+  dplyr::count(celltype_before, celltype_after, name = "n") %>%
+  dplyr::group_by(celltype_before) %>%
+  dplyr::mutate(pct = round(n / sum(n) * 100, 1)) %>%
+  dplyr::ungroup()
+
+p_transition_pct <- ggplot(trans_counts, aes(x = celltype_after, y = celltype_before, fill = pct)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = pct), size = 2.8) +
+  scale_fill_gradient(low = "white", high = "firebrick", name = "% of\nbefore") +
+  theme_minimal() +
+  theme(panel.grid = element_blank(),
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        plot.background = element_rect(fill = "white", color = NA)) +
+  labs(title = "Celltype transition (%): before (celltype_cont) vs after (celltype, DecontX)",
+       x = "Celltype - after DecontX", y = "Celltype - before DecontX")
+
+ggsave(paste0(results_path, "/GEMX/DecontX/Transition_celltype_beforeAfter_decontX.png"), p_transition_pct,
+       width = 10, height = 8, dpi = 300, bg = "white")

@@ -1,44 +1,47 @@
 ##
-##  Parallel script: DecontX ambient RNA correction, per sample
-##  Does NOT modify seurat_1_QC.R - produces corrected count matrices that
-##  can later be swapped in as the input to that script, if desired.
-##
-##  Unlike SoupX, DecontX does NOT need the raw/unfiltered CellRanger matrix
-##  (no empty droplets required) - it estimates contamination directly from
-##  the filtered matrix using a Bayesian mixture model, guided by cluster
-##  labels. This is why we switched to it: raw_feature_bc_matrix is not
-##  available for these samples.
+##  Single Cell Analysis Step 1c: DecontX correction
+##  Runs AFTER seurat_1_QC.R - takes its output (sample_annotated_data.rds:
+##  merged, QC'd, doublet-removed, Harmony-integrated, subtype-annotated)
+##  as input. Per sample, runs DecontX on that sample's already-QC'd cells,
+##  then attaches the corrected counts back onto the SAME object as a new
+##  assay ("RNA_decontX"). The original "RNA" assay is left untouched.
 ##
 
 library(Seurat)
-library(celda)
 library(dplyr)
+library(celda)
+library(harmony)
+library(ggplot2)
 
 project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-data_path <- "/home/usuario/DATASETS/scRNAseq/260106_carlota_GEMX/2026_HN00264849/allPool/"
 results_path <- paste0(project_path, "results/")
-results_DECONTX_path <- paste0(results_path, "GEMX/ContaminationCorrection/")
-dir.create(results_DECONTX_path, recursive = TRUE, showWarnings = FALSE)
+results_GEMX_QC_path <- paste0(results_path, "GEMX/QualityControl/7500/")
+results_GEMX_DECONTX_path <- paste0(results_path, "GEMX/DecontX/")
 
-sample_list <- c("SC7b", "SC8", "SC9", "SC10", "SC11", "SC12", "SC13", "SC14",
-                  "SC15", "SC16", "SC17", "SC18", "SC19", "SC20", "SC21", "SC5_SC22")
+# --- Load the output of seurat_1_QC.R ---
+dwQC <- readRDS(file.path(results_GEMX_QC_path, "sample_annotated_data.rds"))
+cat("\n QC output loaded: ", ncol(dwQC), " cells, ", length(unique(dwQC$orig.ident)), " samples \n")
+dwQC <- JoinLayers(dwQC)
 
-dwAnnotated <- readRDS(file.path(results_GEMX_CA_path, "fully_annotated_data.rds"))
-dwAnnotated <- JoinLayers(dwAnnotated)
-all_genes <- rownames(dwAnnotated)
-corrected_full <- Matrix::Matrix(0, nrow = length(all_genes), ncol = ncol(dwAnnotated),
-                                   sparse = TRUE, dimnames = list(all_genes, colnames(dwAnnotated)))
+sample_names <- sort(unique(as.character(dwQC$orig.ident)))
 
-for (s in sample_list) {
+# Empty matrix to fill in, same genes/cells as the full object
+all_genes <- rownames(dwQC)
+contamination_full <- setNames(rep(NA_real_, ncol(dwQC)), colnames(dwQC))
+corrected_list <- list()
+
+# =================================================================
+# Run DecontX per sample, on cells already QC'd/doublet-filtered by
+# seurat_1_QC.R (no re-loading raw CellRanger matrices needed)
+# =================================================================
+for (s in sample_names) {
 
   cat(paste0("\n\n ==== Sample: ", s, " ==== \n"))
 
-  filtered_path <- paste0(data_path, s, "_filtered_feature_barcode_matrix/")
-  toc <- Read10X(filtered_path)  # only the filtered matrix is needed
+  sample_cells <- colnames(dwQC)[dwQC$orig.ident == s]
+  toc <- GetAssayData(dwQC, assay = "RNA", layer = "counts")[, sample_cells]
 
-  # Quick, low-resolution clustering - DecontX uses cluster identity to guide
-  # its contamination estimate (recommended, not strictly required). This is
-  # NOT your final pipeline clustering, just a fast preliminary pass.
+  # Quick, low-resolution clustering just to guide DecontX
   srat_tmp <- CreateSeuratObject(toc)
   srat_tmp <- NormalizeData(srat_tmp, verbose = FALSE)
   srat_tmp <- FindVariableFeatures(srat_tmp, verbose = FALSE)
@@ -46,59 +49,111 @@ for (s in sample_list) {
   srat_tmp <- RunPCA(srat_tmp, npcs = 20, verbose = FALSE)
   srat_tmp <- FindNeighbors(srat_tmp, dims = 1:20, verbose = FALSE)
   srat_tmp <- FindClusters(srat_tmp, resolution = 0.5, verbose = FALSE)
-
   cluster_labels <- as.integer(factor(srat_tmp$seurat_clusters))
 
-  # Run DecontX
   decontx_res <- decontX(x = toc, z = cluster_labels)
+  corrected_list[[s]] <- decontx_res$decontXcounts
+  contamination_full[sample_cells] <- decontx_res$contamination
 
-  corrected_counts <- decontx_res$decontXcounts
-  contamination_per_cell <- decontx_res$contamination
-
-  saveRDS(corrected_counts, paste0(results_DECONTX_path, s, "_corrected_counts.rds"))
-
-  sample_cells <- colnames(dwAnnotated)[dwAnnotated$orig.ident == s]
-  raw_barcodes <- sub("_[0-9]+$", "", sample_cells)
-  matched_idx <- match(raw_barcodes, colnames(corrected_s))
-  shared_genes <- intersect(rownames(corrected_s), all_genes)
-  corrected_full[shared_genes, sample_cells[valid]] <- corrected_s[shared_genes, matched_idx[valid]]
-
-  sce <- SingleCellExperiment(assays = list(counts = toc))
-  decontXcounts(sce) <- corrected_counts
-  sce$decontX_clusters <- cluster_labels
-  sce$decontX_contamination <- contamination_per_cell
-  reducedDim(sce, "decontX_UMAP") <- decontx_res$estimates$decontX$UMAP
-
-  # --- 1. DecontX's own clusters on its own UMAP ---
-  p1 <- plotDimReduceCluster(x = sce$decontX_clusters,
-                               dim1 = reducedDim(sce, "decontX_UMAP")[, 1],
-                               dim2 = reducedDim(sce, "decontX_UMAP")[, 2])
-  ggsave(paste0(results_path_plots, s, "_decontX_clusters_UMAP.png"), p1, width = 6, height = 5, dpi = 300, bg = "white")
-
-  # --- 2. Per-cell contamination fraction on the UMAP - the most informative one ---
-  p2 <- plotDecontXContamination(sce)
-  ggsave(paste0(results_path_plots, s, "_decontX_contamination_UMAP.png"), p2, width = 6, height = 5, dpi = 300, bg = "white")
-
-  # --- 3. % of marker genes detected, before vs after correction ---
-  markers_list <- list(
-    Collagen = collagen_genes,
-    Tcell = intersect(c("CD3D", "CD3E"), rownames(toc)),
-    Myeloid = intersect(c("LYZ", "CD68"), rownames(toc)),
-    Bcell = intersect(c("CD79A", "MS4A1"), rownames(toc))
-  )
-  markers_list <- markers_list[sapply(markers_list, length) > 0]
-
-  p3 <- plotDecontXMarkerPercentage(sce, markers = markers_list, assayName = c("counts", "decontXcounts"))
-  ggsave(paste0(results_path_plots, s, "_decontX_markerPct_beforeAfter.png"), p3, width = 8, height = 6, dpi = 300, bg = "white")
-
-  # --- 4. Raw expression of individual marker genes, before vs after ---
-  p4 <- plotDecontXMarkerExpression(sce, unlist(markers_list))
-  ggsave(paste0(results_path_plots, s, "_decontX_markerExpr_beforeAfter.png"), p4, width = 8, height = 6, dpi = 300, bg = "white")
-
-  cat(paste0("\n Sample ", s, " done -> ", results_DECONTX_path, s, "_corrected_counts.rds \n"))
+  cat(paste0(" Mean estimated contamination: ", round(mean(decontx_res$contamination), 3), "\n"))
 }
-dwAnnotated[["RNA_decontX"]] <- CreateAssayObject(counts = corrected_full)
-dwAnnotated <- NormalizeData(dwAnnotated, assay = "RNA_decontX", verbose = FALSE)
-saveRDS(dwAnnotated, paste0(results_DECONTX_path, "decontx_corrected_data.rds"))
 
-cat("\n ---- FINISHED DecontX CORRECTION (all samples) ---- \n")
+corrected_full <- do.call(cbind, corrected_list)
+corrected_full <- corrected_full[, colnames(dwQC)]
+
+# =================================================================
+# Attach corrected counts + contamination onto the full object
+# =================================================================
+dwQC[["RNA_decontX"]] <- CreateAssayObject(counts = corrected_full)
+dwQC$decontX_contamination <- contamination_full
+DefaultAssay(dwQC) <- "RNA_decontX"
+
+dwQC <- NormalizeData(dwQC, assay = "RNA_decontX")
+dwQC <- FindVariableFeatures(dwQC, assay = "RNA_decontX")
+dwQC <- ScaleData(dwQC, assay = "RNA_decontX")
+dwQC <- RunPCA(dwQC, assay = "RNA_decontX", reduction.name = "pca_decontX", reduction.key = "PCdX_")
+
+dwQC <- RunHarmony(
+  dwQC,
+  group.by.vars = "orig.ident",
+  reduction.use = "pca_decontX",
+  assay.use = "RNA_decontX",
+  reduction.save = "harmony_decontX"
+)
+
+saveRDS(dwQC, file.path(results_GEMX_DECONTX_path, "decontx_data.rds"))
+
+mean_after <- Matrix::rowMeans(GetAssayData(dwQC, assay = "RNA_decontX", layer = "data"))
+DefaultAssay(dwQC) <- "RNA"
+mean_before <- Matrix::rowMeans(GetAssayData(dwQC, assay = "RNA", layer = "data"))
+DefaultAssay(dwQC) <- "RNA_decontX"
+
+
+shared_genes <- intersect(names(mean_before), names(mean_after))
+
+gene_change_df <- data.frame(
+  gene = shared_genes,
+  avg_before = mean_before[shared_genes],
+  avg_after = mean_after[shared_genes]
+) %>%
+  mutate(avg_drop = avg_before - avg_after,
+         avg_drop_pct = ifelse(avg_before > 0, (avg_before - avg_after) / avg_before * 100, NA))
+
+# --- Scatter before vs after, con línea 1:1 - visión global de cuánto se aleja cada gen de "sin cambio" ---
+p_scatter <- ggplot(gene_change_df, aes(x = avg_before, y = avg_after)) +
+  geom_point(size = 0.4, alpha = 0.3, color = "steelblue") +
+  geom_abline(slope = 1, intercept = 0, color = "firebrick", linetype = "dashed") +
+  theme_bw() + theme(panel.grid = element_blank()) +
+  labs(title = "Genome-wide expression: before vs after DecontX",
+       subtitle = "Points below the red line = genes reduced by correction",
+       x = "Average expression (before)", y = "Average expression (after)")
+ggsave(paste0(results_GEMX_DECONTX_path, "GenomeWide_scatter_beforeAfter.png"), p_scatter,
+       width = 7, height = 7, dpi = 300, bg = "white")
+
+
+# --- MA-plot - magnitud de expresión vs magnitud del cambio, con top genes etiquetados ---
+top_labeled <- gene_change_df %>% slice_max(order_by = avg_drop, n = 15)
+
+p_ma <- ggplot(gene_change_df, aes(x = avg_before, y = avg_drop)) +
+  geom_point(size = 0.4, alpha = 0.3, color = "grey50") +
+  geom_point(data = top_labeled, color = "firebrick", size = 1.2) +
+  geom_text(data = top_labeled, aes(label = gene), size = 3, vjust = -0.6, check_overlap = TRUE) +
+  theme_bw() + theme(panel.grid = element_blank()) +
+  labs(title = "MA-plot: expression level vs DecontX correction magnitude",
+       subtitle = "Top 15 most affected genes highlighted",
+       x = "Average expression (before)", y = "avg_before - avg_after") +
+  ylim(c(0,2)) + xlim(c(0,3))
+ggsave(paste0(results_GEMX_DECONTX_path, "GenomeWide_MAplot.png"), p_ma, width = 9, height = 7, dpi = 300, bg = "white")
+
+
+# --- Distribución del % de reducción, a nivel genoma completo ---
+p_hist <- ggplot(gene_change_df %>% filter(!is.na(avg_drop_pct)), aes(x = avg_drop_pct)) +
+  geom_histogram(bins = 60, fill = "steelblue", alpha = 0.7) +
+  theme_bw() + theme(panel.grid = element_blank()) +
+  labs(title = "Distribution of % expression reduction across all genes",
+       x = "% reduction (avg_before -> avg_after)", y = "N genes")
+ggsave(paste0(results_GEMX_DECONTX_path, "GenomeWide_pctDrop_histogram.png"), p_hist,
+       width = 8, height = 5, dpi = 300, bg = "white")
+
+
+# --- Top 30 genes más afectados, como dumbbell (before -> after) ---
+top30_dumbbell <- gene_change_df %>%
+  slice_max(order_by = avg_drop, n = 30) %>%
+  mutate(gene = reorder(gene, avg_drop))
+
+p_top30_dumbbell <- ggplot(top30_dumbbell) +
+  geom_segment(aes(x = avg_before, xend = avg_after, y = gene, yend = gene), color = "grey60") +
+  geom_point(aes(x = avg_before, y = gene), color = "firebrick", size = 2.5) +
+  geom_point(aes(x = avg_after, y = gene), color = "steelblue", size = 2.5) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  labs(title = "Top 30 genes most affected by DecontX: before (red) vs after (blue)",
+       x = "Average expression", y = NULL)
+
+ggsave(paste0(results_GEMX_DECONTX_path, "GenomeWide_top30_dumbbell.png"), p_top30_dumbbell,
+       width = 8, height = 9, dpi = 300, bg = "white")
+
+cat(paste("\n ---- FINISHED DECONTX CORRECTION ----
+    Generated files:
+      · sample_annotated_data_decontX.rds (RNA + RNA_decontX assays, both on the full merged/integrated object)
+      · (per sample) <sample>_collagen_before_after.csv
+          "))
