@@ -2,12 +2,11 @@
 ##  Single Cell Analysis Step 3c: inferCNV
 ##
 
-# Load Libraries
 library(dplyr)
 library(Seurat)
 library(SeuratObject)
 library(infercnv)
-
+‘dlm’, ‘mixtools’, ‘MCMCpack’, ‘transport’
 # Set Paths
 project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")

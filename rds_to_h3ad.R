@@ -29,14 +29,14 @@ rds_to_h5ad <- function(object_path, file_path, file_name){
     x = object,
     file_path = file_path,
     file_name = file_name,
-    assay = "RNA",
+    assay = "RNA_decontX",
     main_layer = "counts",
     other_layers = c("data"),
     verbose = TRUE
   )}
 
-object_path <- paste0(results_path, "GEMX/CellAnnotation/7500/fully_annotated_data.rds")
-file_path <- paste0(results_path, "GEMX/CellCommunication/7500/")
+object_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/fully_annotated_data.rds")
+file_path <- paste0(results_path, "GEMX/DecontX/CellCommunication/")
 file_name <- "fully_annotated_data.h5ad"
 
 rds_to_h5ad(object_path = object_path, file_path = file_path, file_name = file_name)
