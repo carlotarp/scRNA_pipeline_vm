@@ -24,7 +24,7 @@ source(paste0(wd, "CA_plots.R"))
 source(paste0(wd, "CL_plots.R"))
 
 # Load Fully Annotated Data
-dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "notumor_annotated_data.rds"))
+dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "Copykat/copykat_annotated_data.rds"))
 cat("\n Fully annotated data loaded \n")
 
 

@@ -224,13 +224,17 @@ pam50_diff <- differential_scores_by_cluster(dwTumoral, pam50_score_cols)
 write.csv(pam50_diff, paste0(results_GEMX_TUMOR_path, "Differential_PAM50_byCluster.csv"), row.names = FALSE)
 cat("\n Differential PAM50 module scores per cluster done \n")
 
-
-
 # Diferential Cluster Analisys by Cell Cycle Score
 cellcycle_score_cols <- c("S.Score", "G2M.Score")
 cellcycle_diff <- differential_scores_by_cluster(dwTumoral, cellcycle_score_cols)
 write.csv(cellcycle_diff, paste0(results_GEMX_TUMOR_path, "Differential_CellCycle_byCluster.csv"), row.names = FALSE)
 cat("\n Differential cell cycle scores per cluster done \n")
+
+# Diferential Cluster Analisys by Cell Cycle Score
+copykat_score_cols <- c("copykat_prediction", "copykat_cnas")
+copykat_diff <- differential_scores_by_cluster(dwTumoral, copykat_score_cols)
+write.csv(copykat_diff, paste0(results_GEMX_TUMOR_path, "Differential_CellCycle_byCNA.csv"), row.names = FALSE)
+cat("\n Differential copykat scores per cluster done \n")
 
 # --- Heatmap of PROGENy Differential scores by Cluster ---
 p_progeny_diff <- ggplot(progeny_diff, aes(x = cluster, y = pathway, fill = avg_diff)) +
@@ -289,6 +293,9 @@ plot_differential_barplot(paste0(results_GEMX_TUMOR_path, "Differential_PROGENyD
                             "pathway", "Differential DecoupleR-PROGENy pathway activity by cluster",
                             "Barplot_Differential_PROGENyDecoupleR.png", results_GEMX_TUMOR_path)
 
+plot_differential_barplot(paste0(results_GEMX_TUMOR_path, "Differential_Copykat_byCluster.csv"),
+                            "score", "Differential Copykat pathway activity by cluster",
+                            "Barplot_Differential_Copykat.png", results_GEMX_TUMOR_path)
 
 ##
 ##  Linear relationships & correlations across all continuous scores:
@@ -302,7 +309,6 @@ colnames(pam50_scores) <- c("PAM50_Lum", "PAM50_TNBC", "PAM50_Her2")
 
 cellcycle_scores <- dwTumoral@meta.data[, c("S.Score", "G2M.Score")]
 
-#infercna_scores <- dwTumoral@meta.data[, c("cnaSignal", "cnaCor")]
 
 progeny_scores <- t(as.matrix(GetAssayData(dwTumoral, assay = "progeny", layer = "data")))
 
