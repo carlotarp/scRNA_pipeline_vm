@@ -155,5 +155,5 @@ ggsave(paste0(results_GEMX_DECONTX_path, "GenomeWide_top30_dumbbell.png"), p_top
 cat(paste("\n ---- FINISHED DECONTX CORRECTION ----
     Generated files:
       · sample_annotated_data_decontX.rds (RNA + RNA_decontX assays, both on the full merged/integrated object)
-      · (per sample) <sample>_collagen_before_after.csv
+      · (sample)_collagen_before_after.csv
           "))

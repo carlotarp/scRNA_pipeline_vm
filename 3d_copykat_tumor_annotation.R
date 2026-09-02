@@ -27,14 +27,14 @@ dwAnnotated <- readRDS(paste0(results_GEMX_COPYKAT_path, "copykat_annotated_data
 # Edit to match your $celltype values exactly.
 # =================================================================
 ref_groups <- c(
-  "TCell_naive", "TCell_cyto", "TCell_ex", "BCell", "PlasmaBlast", "Mast"
+  "TCell_naive", "TCell_cyto", "TCell_ex"
 )
 
 dwAnnotated_joined <- JoinLayers(dwAnnotated)
 ref_cells <- colnames(dwAnnotated_joined)[dwAnnotated_joined$celltype %in% ref_groups]
 cat(paste0("\n Reference cells (pooled across all samples): ", length(ref_cells), " \n"))
 
-samples <- sort(unique(as.character(dwAnnotated_joined$orig.ident[dwAnnotated_joined$lineage == "Tumor"])))
+samples <- sort(unique(as.character(dwAnnotated_joined$orig.ident)))
 cat(paste0("\n Running copyKAT per sample (", length(samples), "): ", paste(samples, collapse = ", "), "\n"))
 
 
@@ -45,7 +45,7 @@ cat(paste0("\n Running copyKAT per sample (", length(samples), "): ", paste(samp
 predictions_list <- list()
 cna_list <- list()
 
-for (s in setdiff(samples, c("SC10", "SC11", "SC12", "SC13", "SC14", "SC15", "SC16", "SC17", "SC18", "SC19", "SC20", "SC21"))) {
+for (s in samples) {
 
   cat(paste0("\n\n ==== Sample: ", s, " ==== \n"))
   results_sample_path <- paste0(results_GEMX_COPYKAT_path, s, "/")
@@ -62,8 +62,8 @@ for (s in setdiff(samples, c("SC10", "SC11", "SC12", "SC13", "SC14", "SC15", "SC
     copykat(
       rawmat = raw_counts_s,
       id.type = "S",
-      ngene.chr = 5,
-      win.size = 25,
+      ngene.chr = 2,
+      win.size00000000000000000 = 25,
       KS.cut = 0.1,
       sam.name = s,
       distance = "euclidean",
@@ -87,7 +87,8 @@ for (s in setdiff(samples, c("SC10", "SC11", "SC12", "SC13", "SC14", "SC15", "SC
   cna_list[[s]] <- copykat_result$CNAmat
 
   generated_files <- list.files(results_sample_path, full.names = TRUE)
-  file.remove(generated_files)
+  files_to_delete <- generated_files[!grepl("\\.jpeg$", generated_files, ignore.case = TRUE)]
+
 
   cat(paste0(" Sample ", s, " done -> ", results_sample_path, "\n"))
 }
