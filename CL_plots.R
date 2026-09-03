@@ -69,7 +69,7 @@ plot_resolution_grid <- function(object, results_path,
       theme(legend.position = "none")
     plot_list[[as.character(res)]] <- p
 
-    # Enlaces del sankey: solo se puede construir a partir de la 2a resolution en adelante
+    # Sankey links: can only be built starting from the second resolution
     if (!is.null(prev_clusters)) {
       df <- data.frame(source = prev_clusters, target = current_clusters) %>%
         dplyr::group_by(source, target) %>%
@@ -83,14 +83,14 @@ plot_resolution_grid <- function(object, results_path,
     prev_clusters <- current_clusters
   }
 
-  # Guardar grid de UMAPs
+  # Save UMAP resolution grid
   ncol_grid <- min(3, length(resolutions))
   combined <- wrap_plots(plot_list, ncol = ncol_grid)
   ggsave(paste0(results_path, "ResolutionGrid.png"), combined,
          width = 6 * ncol_grid, height = 6 * ceiling(length(resolutions) / ncol_grid),
          dpi = 300, limitsize = FALSE)
 
-  # Guardar sankey (solo si hubo al menos 2 resoluciones)
+  # Save sankey (only if at least 2 resolutions were tested)
   if (nrow(links) > 0) {
     nodes <- data.frame(name = unique(c(links$source, links$target)))
     links$IDsource <- match(links$source, nodes$name) - 1

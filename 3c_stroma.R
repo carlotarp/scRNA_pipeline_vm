@@ -1,5 +1,8 @@
 ##
-##  Single Cell Analysis Step 3b: Stroma Annotation
+##  Single Cell Analysis Step 3c: Stroma annotation
+##  Runs AFTER 3b_leukocytes.R — takes the partially annotated object as input.
+##  Subsets and reclusters stromal cells, assigns fine-grained cell types using
+##  marker dotplots, then transfers labels back to the full object.
 ##
 
 # Import libraries
@@ -11,17 +14,18 @@ project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
 wd <- paste0(project_path, "codes/scRNA_pipeline/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX//DecontX/CellAnnotation/")
+results_GEMX_CA_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/")
 results_GEMX_SCA_path <- paste0(results_GEMX_CA_path, "Stroma/")
 
-# Import Plot Functions
+# Import plot functions and shared utilities
 source(paste0(wd, "CA_plots.R"))
+source(paste0(wd, "utils.R"))
 
-# Load lineage Annotated Data
+# Load lineage annotated data
 dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "fully_annotated_data.rds"))
 cat("\n lineage-annotated data loaded \n")
 
-# Set Stroma Markers
+# Set stroma markers
 markers_Stromal <- list(
 
   # --- Fibroblast / CAF subtypes ---
@@ -30,7 +34,7 @@ markers_Stromal <- list(
     iCAF = c("CXCL12", "CXCL14", "IL6", "PDGFRA", "CFD"),           # inflammatory, cytokine-secreting
     apCAF = c("CD74", "HLA-DRA", "HLA-DRB1"),                        # antigen-presenting CAF
     matrixCAF = c("COL1A1", "COL1A2", "COL3A1", "FN1", "LUM"),      # ECM-producing, general fibroblast
-    vascularCAF = c("PECAM1", "RGS5", "NOTCH3")                      # perivascular-like CAF (más reciente en literatura)
+    vascularCAF = c("PECAM1", "RGS5", "NOTCH3")                      # perivascular-like CAF
   ),
 
   # --- Endothelial subtypes ---
@@ -40,7 +44,7 @@ markers_Stromal <- list(
     Venous = c("ACKR1", "SELP", "NR2F2"),
     Capillary = c("CA4", "RGCC"),
     Lymphatic = c("PROX1", "PDPN", "LYVE1", "CCL21"),
-    Tip_cell = c("ESM1", "ANGPT2", "APLN")                           # angiogénesis activa, punta de brote vascular
+    Tip_cell = c("ESM1", "ANGPT2", "APLN")                           # active angiogenesis, vascular sprout tip
   ),
 
   # --- Mural cells (peri/vascular support) ---
@@ -53,47 +57,13 @@ markers_Stromal <- list(
   Adipocyte = list( Adipocyte = c("ADIPOQ", "PLIN1", "FABP4", "LEP"))
 )
 
-# Generate Subsets
-generate_subset <- function(object, results_path) {
-  object_subset <- subset(object, subset = lineage == "Stromal")
-  object_subset[["RNA_decontX"]] <- split(object_subset[["RNA_decontX"]], f = object_subset$orig.ident)
-  object_subset <- NormalizeData(object_subset)
-  object_subset <- FindVariableFeatures(object_subset)
-  object_subset <- ScaleData(object_subset)
+# Subset and recluster stromal cells
+dwStroma <- generate_lineage_subset(dwAnnotated, lineage_name = "Stromal", resolution = 0.2)
+plot_dimplot(dwStroma, reduction = "umap", group_by = "seurat_clusters",
+             results_path = results_GEMX_SCA_path,
+             filename = "DimPlot_UMAP_Stroma.png", label = TRUE)
 
-  object_subset <- RunPCA(object_subset)
-
-  object_subset <- IntegrateLayers(
-    object = object_subset, method = HarmonyIntegration,
-    orig.reduction = "pca", new.reduction = "harmony", verbose = FALSE
-  )
-
-  pct <- object_subset[["pca"]]@stdev / sum(object_subset[["pca"]]@stdev) * 100
-  cumu <- cumsum(pct)
-  co1 <- which(cumu > 90 & pct < 5)[1]
-  co2 <- sort(which((pct[1:length(pct) - 1] - pct[2:length(pct)]) > 0.1), decreasing = TRUE)[1] + 1
-  co3_subset <- min(co1, co2)
-  cat(paste0("  co3 Computed: ", co3_subset, "\n"))
-
-  object_subset <- FindNeighbors(object_subset, reduction = "harmony", dims = 1:co3_subset) # reduction = "harmony"
-  object_subset <- RunUMAP(object_subset, reduction = "harmony", dims = 1:co3_subset) # reduction = "harmony"
-  object_subset <- FindClusters(object_subset, resolution = 0.2)
-  object_subset <- JoinLayers(object_subset)
-
-  # --- Visualize UMAP ---
-  plot_dimplot(object_subset, reduction = "umap", group_by = "seurat_clusters",
-               results_path = results_path,
-               filename = paste0("DimPlot_UMAP_Stroma.png"), label = TRUE)
-
-  return(object_subset)
-}
-
-dwStroma <- generate_subset(
-    object = dwAnnotated,
-    results_path = results_GEMX_SCA_path
-  )
-
-  # --- Dotplot by Subtype ---
+# --- Dotplots by subtype ---
 for (subtype in names(markers_Stromal)){
   plot_marker_dotplot(dwStroma, marker_groups = markers_Stromal[[subtype]],
                        results_path = results_GEMX_SCA_path,
@@ -101,27 +71,11 @@ for (subtype in names(markers_Stromal)){
                        group_by = "seurat_clusters")
 }
 
-# Find Markers of Ambiguous Clusters
-find_markers_for_clusters <- function(object, clusters, results_path, top_n = 20) {
-  clusters <- as.character(clusters)
-  object_joined <- JoinLayers(object)
-
-  for (cl in clusters) {
-    markers_out <- FindMarkers(object_joined, ident.1 = cl, max.cells.per.ident = 5000)
-    markers_out <- head(markers_out[order(-markers_out$avg_log2FC), ], top_n)
-    write.csv(markers_out, file.path(results_path, paste0("cluster_", cl, "_FindMarkers.csv")))
-    cat(paste0("  - Cluster ", cl, " -> cluster_", cl, "_FindMarkers.csv\n"))
-  }
-}
-
-# clusters_to_check <- c("5", "7", "8") # 3500
-# clusters_to_check <- c("4", "8") # 5500
 clusters_to_check <- c("5", "10") # 7500
-
 find_markers_for_clusters(dwStroma, clusters_to_check, results_GEMX_SCA_path)
 cat("\n Read Ambiguous Cluster CSV (if needed) to complete the annotation \n")
 
-# Manual Subtype Annotation
+# Manual cluster annotation
 # clusters_Stroma_annotated <- c( #########  3500  #########
 #  "0" = "DC // TAM",  "1" = "TCell_naive",  "2" = "BCell",
 #  "3" = "TCell_cyto",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
@@ -157,14 +111,14 @@ dwStroma$celltype <- factor(dwStroma$celltype)
 plot_dimplot(dwStroma, reduction = "umap", group_by = "celltype", label = T,
              results_path = results_GEMX_SCA_path, filename = "DimPlot_UMAP_Stroma_Annotated.png")
 
-# -- DimPlot to Compare Contaminated vs Decontaminated
+# --- Dimplot comparing contaminated vs decontaminated annotation ---
 plot_dimplot(dwStroma, reduction = "umap", group_by = "celltype_cont", label = T,
              results_path = results_GEMX_SCA_path, filename = "DimPlot_UMAP_StromaContaminated.png")
 
-# Export Annotated Stroma Data
+# Export annotated stroma data
 saveRDS(dwStroma, file.path(results_path, paste0("Stroma.rds")))
 
-# Perform Label Transfer to the Original Seurat Object
+# Label transfer to full object
 annotation_vec <- setNames(as.character(dwStroma[["celltype"]][, 1]),
                             colnames(dwStroma))
 
@@ -184,15 +138,11 @@ plot_dimplot(dwAnnotated, reduction = "umap_decontX", group_by = "celltype", lab
 # Export Annotated Data
 saveRDS(dwAnnotated, file.path(results_GEMX_CA_path, "notumor_annotated_data.rds"))
 
-cat(paste("\n ---- FINISHED Stroma ANNOTATION ----
+cat(paste("\n ---- FINISHED STROMA ANNOTATION ----
     Generated files:
-      · Stroma.rds
-      · notumor_annotated_data.rds
-      · notumor_clean_annotated_data.rds
+        · Stroma.rds
+        · notumor_annotated_data.rds
     Generated plots:
-      · DimPlot_UMAP_(groupedby).png
-      · DotPlot_(groupedby).png
-          "))
-
-
-dwContamina
+        · DimPlot_UMAP_(groupedby).png
+        · DotPlot_(subtype).png
+        "))

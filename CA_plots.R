@@ -38,7 +38,7 @@ plot_marker_dotplot <- function(object, marker_groups, results_path,
                                  group_by = "seurat_clusters",
                                  title = "Marker expression by group") {
   markers <- unique(unlist(marker_groups))
-  markers <- markers[markers %in% rownames(object)]  # evita error si algún gen no está en el objeto
+  markers <- markers[markers %in% rownames(object)]  # skip genes not found in the object
 
   # Map each gene -> "(lineage)_(gene)" label
   gene_label <- sapply(markers, function(g) {

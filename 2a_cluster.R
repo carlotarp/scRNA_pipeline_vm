@@ -1,5 +1,8 @@
 ##
-##  Single Cell Analysis Step 2a: Sample Annotation & Clustering
+##  Single Cell Analysis Step 2a: Clustering
+##  Runs AFTER 1c_decontx.R — takes decontx_data.rds as input.
+##  Finds optimal PCs and resolution, generates UMAP and clusters,
+##  then exports tables and a clustered_data.rds for downstream annotation.
 ##
 
 # Import libraries
@@ -15,14 +18,17 @@ setwd(wd)
 results_path <- paste0(project_path, "results/")
 results_GEMX_CL_path <- paste0(results_path, "GEMX/DecontX/Clustering/")
 
-# Import Plot Functions
+# Import plot functions
 source(paste0(wd, "CL_plots.R"))
 
-# Load Sample Annotated Data
+# Load sample annotated data
 dwIntegrated <- readRDS(paste0(results_path, "GEMX/QualityControl/7500/sample_annotated_data.rds"))
 cat(" Annotated Sample Data Loaded \n")
 
-# Find Optimal Number of PCs
+# Find optimal number of PCs
+# co1: first PC where cumulative variance > 90% AND individual contribution < 5%
+# co2: last PC before a drop > 0.1% (elbow of the variance curve)
+# co3: conservative cutoff — the lesser of co1 and co2
 pct <- dwIntegrated[["pca_decontX"]]@stdev / sum(dwIntegrated[["pca_decontX"]]@stdev) * 100
 cumu <- cumsum(pct)
 co1 <- which(cumu > 90 & pct < 5)[1]
@@ -37,7 +43,7 @@ plot_elbow(dwIntegrated, co3, results_GEMX_CL_path)
 dwIntegrated <- RunUMAP(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3, reduction.name = "umap_decontX")
 cat("\n UMAP Generated \n")
 
-# Find Optimal Resolution for Clustering (visually)
+# Find optimal clustering resolution
 dwIntegrated <- FindNeighbors(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3)
 plot_resolution_grid(dwIntegrated, results_path = results_GEMX_CL_path,
                           reduction = "harmony_decontX",
@@ -45,12 +51,12 @@ plot_resolution_grid(dwIntegrated, results_path = results_GEMX_CL_path,
 res <- 0.5
 cat(paste("\n The Optimal Resolution is", res, "\n"))
 
-# Generate Clusters
+# Generate clusters
 dwIntegrated <- FindClusters(dwIntegrated, resolution = res, cluster.name = "decontX_clusters")
 cat("\n Clusters Generated w/ Optimal Resolution \n")
 
 
-# ---  Visualize Integrated PCA ---
+# --- Visualize integrated PCA ---
 plot_dimplot(dwIntegrated, reduction = "harmony_decontX", group_by = "Subtype",
              results_path = results_GEMX_CL_path, filename = "DimPlot_PCA_bySubtype.png")
 plot_dimplot(dwIntegrated, reduction = "harmony_decontX", group_by = "seurat_clusters", label = T,
@@ -66,7 +72,7 @@ plot_dimplot(dwIntegrated, reduction = "umap_decontX", group_by = "seurat_cluste
 plot_featureplot(dwIntegrated, reduction = "umap_decontX", features = "PTPRC",
                   results_path = results_GEMX_CL_path, filename = "FeaturePlot_UMAP_CD45.png")
 
-# Generate Tables of Interest
+# Generate tables of interest
 cells_clusters <- table(dwIntegrated@meta.data$seurat_clusters, dwIntegrated@meta.data$orig.ident)
 cells_clusters <- cbind(cells_clusters,row.names(cells_clusters))
 write.table(cells_clusters,file=paste0(results_GEMX_CL_path,'cells_per_cluster.tsv'),sep="\t",row.names = FALSE, col.names = TRUE)
@@ -74,13 +80,13 @@ write.table(dwIntegrated@reductions[["umap_decontX"]]@cell.embeddings,file=paste
 write.table(dwIntegrated@meta.data,file=paste0(results_GEMX_CL_path,'clustered_metadata.tsv'),sep="\t",row.names = TRUE, col.names = TRUE)
 cat("\n Tables of Interest Writen \n")
 
-# --- Visualize Cluster Composition ---
+# --- Visualize cluster composition ---
 plot_cluster_composition(dwIntegrated, group_by = "orig.ident",
                           results_path = results_GEMX_CL_path, filename = "ClusterComposition_bySample.png")
 plot_cluster_composition(dwIntegrated, group_by = "Subtype",
                           results_path = results_GEMX_CL_path, filename = "ClusterComposition_bySubtype.png")
 
-# --- Quality Control Plots ---
+# --- Quality control plots ---
 plot_vln_qc_by_group(dwIntegrated, results_path = results_GEMX_CL_path,
                       filename = "VlnPlot_QCmetrics_bySample.png", group_by = "orig.ident")
 plot_vln_qc_by_group(dwIntegrated, results_path = results_GEMX_CL_path,
@@ -120,27 +126,20 @@ for (i in 1:(length(subtypes) - 1)) {
 pairwise_results_df <- do.call(rbind, pairwise_results)
 write.csv(pairwise_results_df, paste0(results_GEMX_CL_path, "pairwisett_nfeaturerna_subtype.csv"), row.names = FALSE)
 
-# Export Clustered Data
+# Export clustered data
 saveRDS(dwIntegrated, file.path(results_GEMX_CL_path, "clustered_data.rds"))
 
-# Generate RNA Expression Matrix
+# Generate RNA expression matrix
 dwIntegrated <- JoinLayers(dwIntegrated)
 count_matrix <- GetAssayData(dwIntegrated, layer = "counts")
 umi_counts_df <- as.data.frame(as.matrix(count_matrix))
 write.table(umi_counts_df,file=paste0(results_GEMX_CL_path,'umi.tsv'),sep="\t",row.names = TRUE, col.names = TRUE)
 rm(umi_counts_df)
 rm(count_matrix)
-print('\n RNA expression table generated \n')
-
-# Identify Cluster de Marker Genes
-tumor_markers_all <- FindAllMarkers(dwIntegrated, only.pos = FALSE, logfc.threshold = -1)
-write.table(tumor_markers_all,file=paste0(results_GEMX_CL_path,'all_tumor_markers.tsv'),sep="\t",row.names = FALSE, col.names = TRUE)
-print('\n Diferential Expression of tumor.markers Performed \n')
-
-# --- Heatmap to Visualize Cluster  ---
-plot_heatmap(dwIntegrated, results_GEMX_CL_path, tumor_markers_all, n = 10)
+cat("\n RNA expression table generated \n")
 
 cat(paste("\n ---- FINISHED CLUSTERING ----
+    Run 2b_markers.R next to compute FindAllMarkers (slow step, separate script).
     Generated files:
       · cells_per_cluster.tsv
       · umap_pvalues.tsv
@@ -148,7 +147,6 @@ cat(paste("\n ---- FINISHED CLUSTERING ----
       · pairwisett_nfeaturerna_subtype.csv
       · clustered_data.rds
       · umi.tsv
-      · all_tumor_markers.tsv
     Generated plots:
       · ElbowPlot.png
       · ResolutionGrid.png
@@ -157,5 +155,4 @@ cat(paste("\n ---- FINISHED CLUSTERING ----
       · FeaturePlot_(reduction)_(features).png
       · ClusterComposition_(groupedby).png
       · VlnPlot_QCmetrics_(groupedby).png
-      · Integrated_Top(n)gene_Heatmap.png
           "))

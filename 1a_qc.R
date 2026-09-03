@@ -1,8 +1,10 @@
 ##
-##  Single Cell Analysis Step 1: Quality Control, Integration & Sample Annotation
+##  Single Cell Analysis Step 1a: Quality Control
+##  Per-sample: load CellRanger data, apply QC filters, detect doublets.
+##  Merges all samples and saves merged_data.rds for 1b_integrate.R.
 ##
 
-# Import libreries
+# Import libraries
 library('Seurat')
 library(dplyr)
 library(tibble)
@@ -19,7 +21,7 @@ GEMX_path <- paste0(cellranger_path, "260106_carlota_GEMX/2026_HN00264849/allPoo
 data_path <- "_filtered_feature_barcode_matrix/"
 results_GEMX_QC_path <- paste0(results_path, "GEMX/QualityControl/")
 
-# Import Plot Functions
+# Import plot functions
 source(paste0(wd, "QC_plots.R"))
 
 # Set lists
@@ -148,63 +150,11 @@ merged_seurat <- merge(x = sample_list[[1]],
 saveRDS(merged_seurat, file.path(results_GEMX_QC_path, "merged_data.rds"))
 cat("\n Seurat Objects Merged \n")
 
-# --- Compare samples after individual QC, before normalizing ---
-plot_vln_compare_samples(merged_seurat, results_path = results_GEMX_QC_path)
-
-# Normalize, Scale and Run PCA
-merged_seurat <- NormalizeData(merged_seurat)
-merged_seurat <- FindVariableFeatures(merged_seurat)
-merged_seurat <- ScaleData(merged_seurat)
-merged_seurat <- RunPCA(merged_seurat)
-cat("\n Normalized, Scaled and ran PCA")
-
-# --- Check batch effect in raw PCA, before integration ---
-plot_dimplot_by_sample(merged_seurat, reduction = "pca", results_path = results_GEMX_QC_path)
-
-# Integrate w/ Harmony
-dwIntegrated <- IntegrateLayers(
-    object = merged_seurat, method = HarmonyIntegration,
-    orig.reduction = "pca", new.reduction = "harmony",
-    verbose = TRUE
-)
-saveRDS(dwIntegrated, file.path(results_GEMX_QC_path, "integrated_harmony_data.rds"))
-cat("\n Data Integrated w/ Harmony \n")
-
-# --- Check batch effect correction after Harmony integration ---
-plot_dimplot_by_sample(dwIntegrated, reduction = "harmony", results_path = results_GEMX_QC_path)
-
-# Add Sample Subtype Annotations
-annot_file <- paste0(cellranger_path, "260106_carlota_GEMX/Samples_scRNAseq_GEMX-Flex.csv")
-
-annot_df <- read.csv(annot_file, stringsAsFactors = FALSE)
-annot_df <- annot_df %>%
-    select(scRNAseq_ID, Subtype) %>%
-    distinct() %>%
-    mutate(
-        scRNAseq_ID = as.character(scRNAseq_ID),
-        Subtype = as.character(Subtype)
-    )
-
-# --- Percentage of cells filtered per sample, colored by tumor subtype ---
-plot_pct_filtered_by_subtype(cell_counts_df, annot_df, results_path = results_GEMX_QC_path)
-
-cat("\n Sample Annotation Data Loaded \n")
-
-dwIntegrated@meta.data <- dwIntegrated@meta.data %>%
-    rownames_to_column("cell_id") %>%
-    left_join(annot_df, by = c("orig.ident" = "scRNAseq_ID")) %>%
-    column_to_rownames("cell_id")
-
-dwIntegrated$Subtype <- factor(dwIntegrated$Subtype)
-saveRDS(dwIntegrated, file.path(results_GEMX_QC_path, "sample_annotated_data.rds"))
-cat("\n Samples Annotated \n")
-
-cat(paste("\n ---- FINISHED QUALITY CONTROL, INTEGRATION & SAMPLE ANNOTATION ----
+cat(paste("\n ---- FINISHED QUALITY CONTROL ----
+    Run 1b_integrate.R next.
     Generated files:
         · cell_filtering.csv
         · merged_data.rds
-        · integrated_harmony_data.rds
-        · sample_annotated_data.rds
     Generated plots:
         · nCountRNA_vs_nFeatureRNA_(sample).png
         · nFeatureRNA_(sample).png
@@ -212,8 +162,5 @@ cat(paste("\n ---- FINISHED QUALITY CONTROL, INTEGRATION & SAMPLE ANNOTATION ---
         · MitoVsNFeature_(sample).png
         · DoubletScore_(sample).png
         · DoubletScatter_(sample).png
-        · VlnPlot_compare_samples_postQC.png
         · QC_cell_counts_subplots.png
-        · QC_percentage_filtered_with_labels.png
-        · DimPlot_(reduction)_bySample.png
         "))

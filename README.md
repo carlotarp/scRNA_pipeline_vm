@@ -1,0 +1,158 @@
+# scRNA-seq Pipeline — Breast Cancer (GEMX-Flex)
+
+Single-cell RNA-seq analysis pipeline for breast cancer samples sequenced with 10X Genomics GEM-X Flex. Covers the full workflow from raw CellRanger output to tumor subtype annotation, pathway activity scoring, and cell-cell communication.
+
+---
+
+## Pipeline overview
+
+Scripts are numbered in execution order. Steps 3b, 3c, and 3e/3f can run in parallel once 3a is complete. Step 3d requires 3e (CopyKAT) to run first.
+
+```
+CellRanger output
+      │
+1a_qc.R               Per-sample QC, doublet detection (scDblFinder), merge
+      │
+1b_integrate.R        Harmony integration, clinical subtype annotation
+      │
+1c_decontx.R          DecontX contamination correction
+      │
+2a_cluster.R          Optimal PCs, UMAP, clustering
+      │
+      ├── 2b_markers.R        FindAllMarkers (very slow)
+      │
+3a_lineage.R          Broad lineage annotation (Tumor / Leukocytes / Stromal)
+      │
+      ├── 3b_leukocytes.R     Leukocyte subtype annotation
+      ├── 3c_stroma.R         Stromal subtype annotation
+      ├── 3d_tumor.R          Tumor subset: PAM50, PROGENy, DecoupleR, cell cycle, FindMarkers
+      ├── 3e_copykat.R        CopyKAT CNV ploidy prediction
+      ├── 3f_infercnv.R       inferCNV CNV ploidy prediction
+      └── 3g_tumor_analysis.R Differential scores, plots → manual annotation → fully_annotated_data.rds
+          
+```
+
+> **Note:** `4_tumor_analysis.R` is designed to be run twice: first to generate all cluster-level plots, then again after filling in the `clusters_tumor_annotated` dictionary to export the final annotated objects.
+
+**Notebooks** (independent, each requires its own conda environment):
+
+| Notebook | Tool | Environment | Purpose |
+|---|---|---|---|
+| `3y_compocyte_cell_annotation.ipynb` | Compocyte | `compocyte_only` | Pretrained TIL hierarchical classifier |
+| `3z_scMalignant_cell_annotation.ipynb` | scMalignantFinder | `scmalignant` | Malignancy probability per cell |
+| `4a_liana_cell_communication.ipynb` | LIANA | `decoupler_liana` | Cell-cell communication, chord diagrams |
+
+---
+
+## File structure
+
+```
+scRNA_pipeline_vm/
+│
+├── Pipeline scripts
+│   ├── 1a_qc.R
+│   ├── 1b_integrate.R
+│   ├── 1c_decontx.R
+│   ├── 2a_cluster.R
+│   ├── 2b_markers.R
+│   ├── 3a_lineage.R
+│   ├── 3b_leukocytes.R
+│   ├── 3c_stroma.R
+│   ├── 3d_tumor.R
+│   ├── 3e_copykat.R
+│   ├── 3f_infercnv.R
+│   └── 3g_tumor_analysis.R
+│
+├── Notebooks
+│   ├── 3y_compocyte_cell_annotation.ipynb
+│   ├── 3z_scMalignant_cell_annotation.ipynb
+│   └── 4a_liana_cell_communication.ipynb
+│
+├── Plot functions (sourced by pipeline scripts)
+│   ├── QC_plots.R          → used by 1a, 1b
+│   ├── DECONTX_plots.R     → used by 1c
+│   ├── CL_plots.R          → used by 2a, 2b
+│   ├── CA_plots.R          → used by 3a–3f
+│   └── TCA_plots.R         → used by 4
+│
+├── Shared utilities
+│   └── utils.R             generate_lineage_subset(), find_markers_for_clusters()
+│
+└── Auxiliary scripts
+    ├── colagen.R                      Collagen gene distribution analysis
+    ├── cutoff_comparison.R            QC threshold exploration
+    ├── gene_expression_comparison.R   Before/after DecontX gene-level comparison
+    └── rds_to_h3ad.R                  Convert Seurat .rds → .h5ad for Python notebooks
+```
+
+---
+
+## Dependencies
+
+### R packages
+
+| Package | Version | Purpose |
+|---|---|---|
+| Seurat | v5 | Core single-cell framework |
+| harmony | — | Batch correction |
+| celda | — | DecontX contamination correction |
+| scDblFinder | — | Doublet detection |
+| progeny | — | Pathway activity scoring |
+| decoupleR | — | Pathway activity scoring (MLM) |
+| copykat | — | CNV-based ploidy prediction |
+| infercnv | — | CNV inference |
+| dplyr, tibble, tidyr | — | Data wrangling |
+| ggplot2, corrplot, gt | — | Visualisation |
+| Matrix | — | Sparse matrix operations |
+| reticulate | — | R–Python bridge (rds_to_h3ad.R) |
+
+### Python environments
+
+| Environment | Key packages |
+|---|---|
+| `compocyte_only` | Compocyte, scanpy, anndata, pandas |
+| `scmalignant` | scMalignantFinder, scanpy, pandas, matplotlib |
+| `decoupler_liana` | liana, scanpy, pycirclize, pandas, matplotlib |
+
+---
+
+## How to run
+
+Set `project_path` and `wd` at the top of each script before running. All scripts use the same path convention:
+
+```r
+project_path <- "/path/to/project/"
+wd <- paste0(project_path, "codes/scRNA_pipeline/")
+```
+
+Run scripts sequentially following the pipeline order. Each script prints a summary of generated files on completion.
+
+For the notebooks, activate the corresponding conda environment first:
+
+```bash
+conda activate compocyte_only
+jupyter notebook 3y_compocyte_cell_annotation.ipynb
+
+conda activate decoupler_liana
+jupyter notebook 4a_liana_cell_communication.ipynb
+```
+
+The notebooks consume `.h5ad` files; use `rds_to_h3ad.R` to convert Seurat objects when needed.
+
+---
+
+## Key outputs
+
+| File | Generated by | Description |
+|---|---|---|
+| `merged_data.rds` | 1a | Merged, QC-filtered Seurat object |
+| `sample_annotated_data.rds` | 1b | Harmony-integrated + clinical subtype metadata |
+| `decontx_data.rds` | 1c | + `RNA_decontX` assay |
+| `clustered_data.rds` | 2a | + UMAP and cluster assignments |
+| `lineage_annotated_data.rds` | 3a | + `lineage` and `celltype` columns |
+| `leuko_annotated_data.rds` | 3b | Leukocyte fine-grained annotation |
+| `notumor_annotated_data.rds` | 3c | Stromal fine-grained annotation |
+| `tumoral_scored.rds` | 3d | Tumor subset + PAM50 / PROGENy / DecoupleR assays (no celltype yet) |
+| `copykat_annotated_data.rds` | 3e | + `copykat_prediction`, `copykat_cnas` columns |
+| `tumoral_annotated.rds` | 4 | Tumor subset with final `celltype` labels |
+| `fully_annotated_data.rds` | 4 | Full object with all lineages annotated |

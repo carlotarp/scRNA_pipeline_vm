@@ -1,5 +1,8 @@
 ##
-##  Single Cell Analysis Step 3a: Cell Annotation
+##  Single Cell Analysis Step 3a: Lineage annotation
+##  Runs AFTER 2a_cluster.R — takes clustered_data.rds as input.
+##  Assigns broad lineages (Tumor / Leukocytes / Stromal) to clusters using
+##  marker dotplots and FindMarkers CSVs, then exports lineage_annotated_data.rds.
 ##
 
 # Import libraries
@@ -13,15 +16,16 @@ setwd(wd)
 results_path <- paste0(project_path, "results/")
 results_GEMX_CA_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/")
 
-# Import Plot Functions
+# Import plot functions and shared utilities
 source(paste0(wd, "CA_plots.R"))
+source(paste0(wd, "utils.R"))
 
-# Load Clustered Data
+# Load clustered data
 dwClustered <- readRDS(paste0(results_path, "GEMX/DecontX/Clustering/clustered_data.rds"))
 dwClustered[["RNA_decontX"]] <- as(dwClustered[["RNA_decontX"]], "Assay5")
 cat("\n Clustered Data Loaded \n")
 
-# Set Markers
+# Set markers
 markers_leukos <- list(
   Leukocyte_pan = c("PTPRC"),
   Myeloid       = c("CD68", "CD163"),
@@ -67,28 +71,11 @@ plot_marker_dotplot(dwClustered, marker_groups = pam50_genes, results_path = res
 
 cat("\n Dot Plots generated \n")
 
-# Find Markers of Ambiguous Clusters
-find_markers_for_clusters <- function(object, clusters, results_path, top_n = 20) {
-  clusters <- as.character(clusters)
-  object_joined <- JoinLayers(object)
-
-  for (cl in clusters) {
-    markers_out <- FindMarkers(object_joined, ident.1 = cl, max.cells.per.ident = 5000)
-    markers_out <- head(markers_out[order(-markers_out$avg_log2FC), ], top_n)
-    write.csv(markers_out, file.path(results_path, paste0("cluster_", cl, "_FindMarkers.csv")))
-    cat(paste0("  - Cluster ", cl, " -> cluster_", cl, "_FindMarkers.csv\n"))
-  }
-}
-
-clusters_to_check <- c("1", "6", "15", "16") # 3500
-clusters_to_check <- c("7", "15") # 5500
-clusters_to_check <- c("1", "8", "16") # 7500
 clusters_to_check <- c("16", "19", "20") # DecontX 7500
-
 find_markers_for_clusters(dwClustered, clusters_to_check, results_GEMX_CA_path)
 cat("\n Read Ambiguous Cluster CSV (if needed) to complete 'cluster_to_lineage' \n")
 
-# Manual Cluster Annotation
+# Manual cluster annotation
 #lineage_clusters_annotated <- c( #########  3500  #########
 #  "0" = "Tumor", "1" = "Tumor", "2" = "Stromal",
 #  "3" = "Leukocytes", "4" = "Leukocytes", "5" = "Tumor",
@@ -137,16 +124,16 @@ dwClustered$lineage <- factor(dwClustered$lineage)
 plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "lineage",
              results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_Lineage.png")
 
-# Create Extra Col for Celltype Annotation
+# Add celltype column (starts as lineage label, refined by lineage scripts)
 dwClustered$celltype <- unname(lineage_clusters_annotated[as.character(dwClustered$decontX_clusters)])
 dwClustered$celltype <- factor(dwClustered$celltype)
 
-# Add Contaminated Data
+# Load contaminated baseline data (for comparison)
 dwContaminated <- readRDS(file.path(results_path, "GEMX/CellAnnotation/7500/notumor_annotated_data.rds"))
 dwClustered$clusters_cont <- dwContaminated$seurat_clusters
 dwClustered$celltype_cont <- dwContaminated$celltype
 
-# --- Dimplots to Compare Cluster and Celltype Distribution
+# --- Dimplots comparing pre/post-decontX cluster and celltype distributions ---
 plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "celltype_cont", label = T,
              results_path = results_GEMX_CA_path, filename = "UMAP_decontX_byContCelltype.png")
 plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "clusters_cont", label = T,
@@ -155,16 +142,17 @@ plot_dimplot(dwClustered, reduction = "umap_decontX", group_by = "decontX_cluste
              results_path = results_GEMX_CA_path, filename = "UMAP_decontX_byDecontClusters.png")
 
 
-# Export Annotated Data
+# Export annotated data
 saveRDS(dwClustered, file.path(results_GEMX_CA_path, "lineage_annotated_data.rds"))
 
-cat(paste("\n ---- FINISHED CELL ANNOTATION ----
+cat(paste("\n ---- FINISHED LINEAGE ANNOTATION ----
+    Run 3b_leukocytes.R, 3c_stroma.R, and 3d_tumor.R next (in any order).
     Generated files:
-      · lineage_annotated_data.rds
-      · cluster_(cluster)_FindMarkers.csv
+        · lineage_annotated_data.rds
+        · cluster_(cluster)_FindMarkers.csv
     Generated plots:
-      · DotPlot_(lineage).png
-      · Dimlot_(groupedby).png
-          "))
+        · DotPlot_(lineage).png
+        · DimPlot_(groupedby).png
+        "))
 
 

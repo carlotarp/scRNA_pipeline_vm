@@ -1,5 +1,8 @@
 ##
-##  Single Cell Analysis Step 3b: Leukocyte Annotation
+##  Single Cell Analysis Step 3b: Leukocyte annotation
+##  Runs AFTER 3a_lineage.R — takes lineage_annotated_data.rds as input.
+##  Subsets and reclusters leukocytes, assigns fine-grained cell types using
+##  marker dotplots, then transfers labels back to the full object.
 ##
 
 # Import libraries
@@ -14,14 +17,15 @@ results_path <- paste0(project_path, "results/")
 results_GEMX_CA_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/")
 results_GEMX_LCA_path <- paste0(results_GEMX_CA_path, "Leukocytes/")
 
-# Import Plot Functions
+# Import plot functions and shared utilities
 source(paste0(wd, "CA_plots.R"))
+source(paste0(wd, "utils.R"))
 
-# Load lineage Annotated Data
+# Load lineage annotated data
 dwAnnotated <- readRDS(paste0(results_GEMX_CA_path, "lineage_annotated_data.rds"))
 cat("\n lineage-annotated data loaded \n")
 
-# Set Leukocyte Markers
+# Set leukocyte markers
 markers_leukocytes <- list(
   TcellNK = list(
     "Tcell_general"          = c("CD3E", "CD3D"),
@@ -77,58 +81,13 @@ markers_leukocytes <- list(
   )
 )
 
-# Generate Subsets
-generate_subset <- function(object, results_path) {
-  object_subset <- subset(object, subset = lineage == "Leukocytes")
-  object_subset[["RNA_decontX"]] <- split(object_subset[["RNA_decontX"]], f = object_subset$orig.ident)
-  object_subset <- NormalizeData(object_subset)
-  object_subset <- FindVariableFeatures(object_subset)
-  object_subset <- ScaleData(object_subset)
+# Subset and recluster leukocytes
+dwLeukocytes <- generate_lineage_subset(dwAnnotated, lineage_name = "Leukocytes", resolution = 0.4)
+plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "seurat_clusters",
+             results_path = results_GEMX_LCA_path,
+             filename = "DimPlot_UMAP_Leukocytes.png", label = TRUE)
 
-  object_subset <- RunPCA(object_subset)
-
-  object_subset <- IntegrateLayers(
-    object = object_subset, method = HarmonyIntegration,
-    orig.reduction = "pca", new.reduction = "harmony", verbose = FALSE
-  )
-
-  pct <- object_subset[["pca"]]@stdev / sum(object_subset[["pca"]]@stdev) * 100
-  cumu <- cumsum(pct)
-  co1 <- which(cumu > 90 & pct < 5)[1]
-  co2 <- sort(which((pct[1:length(pct) - 1] - pct[2:length(pct)]) > 0.1), decreasing = TRUE)[1] + 1
-  co3_subset <- min(co1, co2)
-  cat(paste0("  co3 Computed: ", co3_subset, "\n"))
-
-  object_subset <- FindNeighbors(object_subset, reduction = "harmony", dims = 1:co3_subset) # reduction = "harmony"
-  object_subset <- RunUMAP(object_subset, reduction = "harmony", dims = 1:co3_subset) # reduction = "harmony"
-  object_subset <- FindClusters(object_subset, resolution = 0.4)
-  object_subset <- JoinLayers(object_subset)
-  # 1. ¿Se creó seurat_clusters?
-  "seurat_clusters" %in% colnames(object_subset@meta.data)
-  table(object_subset$seurat_clusters, useNA = "ifany")
-
-  # 2. ¿co3_subset dio un valor válido, o NA?
-  co3_subset
-
-  # 3. ¿Cuántas células tiene el subset en total?
-  ncol(object_subset)
-
-  # 4. ¿Existe la reducción "umap"?
-  names(object_subset@reductions)
-  # --- Visualize UMAP ---
-  plot_dimplot(object_subset, reduction = "umap", group_by = "seurat_clusters",
-               results_path = results_path,
-               filename = paste0("DimPlot_UMAP_Leukocytes.png"), label = TRUE)
-
-  return(object_subset)
-}
-
-dwLeukocytes <- generate_subset(
-    object = dwAnnotated,
-    results_path = results_GEMX_LCA_path
-  )
-
-  # --- Dotplot by Subtype ---
+# --- Dotplots by subtype ---
 for (subtype in names(markers_leukocytes)){
   plot_marker_dotplot(dwLeukocytes, marker_groups = markers_leukocytes[[subtype]],
                        results_path = results_GEMX_LCA_path,
@@ -136,28 +95,11 @@ for (subtype in names(markers_leukocytes)){
                        group_by = "seurat_clusters")
 }
 
-# Find Markers of Ambiguous Clusters
-find_markers_for_clusters <- function(object, clusters, results_path, top_n = 20) {
-  clusters <- as.character(clusters)
-  object_joined <- JoinLayers(object)
-
-  for (cl in clusters) {
-    markers_out <- FindMarkers(object_joined, ident.1 = cl, max.cells.per.ident = 5000)
-    markers_out <- head(markers_out[order(-markers_out$avg_log2FC), ], top_n)
-    write.csv(markers_out, file.path(results_path, paste0("cluster_", cl, "_FindMarkers.csv")))
-    cat(paste0("  - Cluster ", cl, " -> cluster_", cl, "_FindMarkers.csv\n"))
-  }
-}
-
-clusters_to_check <- c("5", "7", "8") # 3500
-clusters_to_check <- c("4", "8") # 5500
-clusters_to_check <- c("5", "10") # 7500
 clusters_to_check <- c("10", "11") # DecontX 7500
-
 find_markers_for_clusters(dwLeukocytes, clusters_to_check, results_GEMX_LCA_path)
 cat("\n Read Ambiguous Cluster CSV (if needed) to complete the annotation \n")
 
-# Manual Subtype Annotation
+# Manual cluster annotation
 #clusters_leuko_annotated <- c( #########  3500  #########
 #  "0" = "DC // TAM",  "1" = "TCell_naive",  "2" = "BCell",
 #  "3" = "TCell_cyto",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
@@ -197,14 +139,14 @@ dwLeukocytes$celltype <- factor(dwLeukocytes$celltype)
 plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "celltype", label = T,
              results_path = results_GEMX_LCA_path, filename = "DimPlot_UMAP_Leuko_Annotated.png")
 
-# -- DimPlot to Compare Contaminated vs Decontaminated
+# --- Dimplot comparing contaminated vs decontaminated annotation ---
 plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "celltype_cont", label = T,
              results_path = results_GEMX_LCA_path, filename = "DimPlot_UMAP_LeukoContaminated.png")
 
-# Export Annotated Leukocyte Data
+# Export annotated leukocyte data
 saveRDS(dwLeukocytes, file.path(results_path, paste0("leukocytes.rds")))
 
-# Perform Label Transfer to the Original Seurat Object
+# Label transfer to full object
 annotation_vec <- setNames(as.character(dwLeukocytes[["celltype"]][, 1]),
                             colnames(dwLeukocytes))
 
@@ -226,9 +168,9 @@ saveRDS(dwAnnotated, file.path(results_GEMX_CA_path, "leuko_annotated_data.rds")
 
 cat(paste("\n ---- FINISHED LEUKOCYTE ANNOTATION ----
     Generated files:
-      · leukocytes.rds
-      · leukocytes_annotated_data.rds
+        · leukocytes.rds
+        · leuko_annotated_data.rds
     Generated plots:
-      · DimPlot_UMAP_(groupedby).png
-      · DotPlot_(groupedby).png
-          "))
+        · DimPlot_UMAP_(groupedby).png
+        · DotPlot_(subtype).png
+        "))
