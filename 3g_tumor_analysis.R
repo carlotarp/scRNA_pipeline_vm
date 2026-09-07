@@ -78,6 +78,10 @@ plot_cluster_composition(dwTumoral, cluster_col = "decontX_clusters", group_by =
                          filename = "BarPlot_PAM50Composition_byCluster.png", results_path = results_GEMX_TUMOR_path)
 plot_cluster_composition(dwTumoral, cluster_col = "decontX_clusters", group_by = "Subtype",
                          filename = "BarPlot_SubtypeComposition_byCluster.png", results_path = results_GEMX_TUMOR_path)
+plot_cluster_composition(dwTumoral, cluster_col = "orig.ident", group_by = "decontX_clusters",
+                         filename = "BarPlot_ClusterComposition_bySample.png", results_path = results_GEMX_TUMOR_path)
+plot_cluster_composition(dwTumoral, cluster_col = "decontX_clusters", group_by = "orig.ident",
+                         filename = "BarPlot_SampleComposition_byCluster.png", results_path = results_GEMX_TUMOR_path)
 
 # --- PAM50 composition stacked bars, faceted by subtype ---
 plot_pam50_composition_facet(dwTumoral, results_GEMX_TUMOR_path)
@@ -96,6 +100,17 @@ plot_marker_dotplot(dwTumoral, group_by = "decontX_clusters",
                     marker_groups = as.list(setNames(rownames(dwTumoral[["progeny"]]),
                                                      rownames(dwTumoral[["progeny"]]))),
                     filename = "DotPlot_Progeny_byCluster.png", results_path = results_GEMX_TUMOR_path)
+
+# --- PROGENy pathway activity on the dedicated PROGENy UMAP ---
+plot_dimplot(dwTumoral, reduction = "umap_progeny", group_by = "PROGENy",
+             results_path = results_GEMX_TUMOR_path, filename = "UMAP_progeny_byPathway.png")
+plot_dimplot(dwTumoral, reduction = "umap_progeny", group_by = "PAM50_predicted",
+             results_path = results_GEMX_TUMOR_path, filename = "UMAP_progeny_byPAM50.png")
+plot_dimplot(dwTumoral, reduction = "umap_progeny", group_by = "decontX_clusters",
+             results_path = results_GEMX_TUMOR_path, filename = "UMAP_progeny_byCluster.png")
+
+# --- PROGENy pathway score distribution boxplots (per cluster and per pathway) ---
+plot_progeny_score_boxplots(dwTumoral, results_GEMX_TUMOR_path)
 
 # --- DecoupleR pathway activity dotplots ---
 DefaultAssay(dwTumoral) <- "progeny_decoupler"
@@ -117,6 +132,10 @@ DefaultAssay(dwTumoral) <- "RNA_decontX"
 plot_dimplot(dwTumoral, reduction = "umap", group_by = "Phase",
              results_path = results_GEMX_TUMOR_path, filename = "DimPlot_CellCyclePhase.png")
 plot_cellcycle_boxplot(dwTumoral, results_GEMX_TUMOR_path)
+
+# --- CopyKAT CNV: prediction composition and CNA burden per cluster ---
+plot_copykat_composition(dwTumoral, results_GEMX_TUMOR_path)
+plot_copykat_cna_boxplot(dwTumoral, results_GEMX_TUMOR_path)
 
 # Compute differential pathway activity per cluster (PROGENy)
 DefaultAssay(dwTumoral) <- "progeny"
@@ -185,9 +204,12 @@ cellcycle_diff <- differential_scores_by_cluster(dwTumoral, cellcycle_score_cols
 write.csv(cellcycle_diff, paste0(results_GEMX_TUMOR_path, "Differential_CellCycle_byCluster.csv"), row.names = FALSE)
 cat("\n Differential cell cycle scores per cluster done \n")
 
-copykat_score_cols <- c("copykat_prediction", "copykat_cnas")
+# copykat_prediction is categorical, so only the numeric CNA burden is tested here;
+# cells with no CopyKAT call carry no detected CNAs.
+dwTumoral$copykat_cnas[is.na(dwTumoral$copykat_cnas)] <- 0
+copykat_score_cols <- c("copykat_cnas")
 copykat_diff <- differential_scores_by_cluster(dwTumoral, copykat_score_cols)
-write.csv(copykat_diff, paste0(results_GEMX_TUMOR_path, "Differential_CellCycle_byCNA.csv"), row.names = FALSE)
+write.csv(copykat_diff, paste0(results_GEMX_TUMOR_path, "Differential_Copykat_byCluster.csv"), row.names = FALSE)
 cat("\n Differential copykat scores per cluster done \n")
 
 # --- Heatmaps of differential pathway activity ---
@@ -248,9 +270,6 @@ for (i in 1:min(10, nrow(top_correlations))) {
 cat("\n Files: Correlation_matrix_allScores.png\n")
 cat(" Plots: top 10 Scatter_*.png (strongest global correlations)\n")
 
-# --- Celltype transition plot (contaminated vs decontaminated) ---
-plot_celltype_transition(dwTumoral, paste0(results_path, "GEMX/DecontX/"))
-
 # Manual cluster annotation
 # Review FindMarkers CSVs (from 3d_tumor.R) and the plots above before filling in.
 # Re-run this script after filling in to generate the final annotated objects.
@@ -262,6 +281,9 @@ clusters_tumor_annotated <- c(
 )
 
 dwTumoral$celltype <- factor(unname(clusters_tumor_annotated[as.character(dwTumoral$decontX_clusters)]))
+
+# --- Celltype transition plot: continuous PAM50 label (celltype_cont) vs final manual annotation ---
+plot_celltype_transition(dwTumoral, paste0(results_path, "GEMX/DecontX/"))
 
 # Label transfer to full annotated object
 annotation_vec <- setNames(as.character(dwTumoral[["celltype"]][, 1]), colnames(dwTumoral))
@@ -292,13 +314,17 @@ cat(paste("\n ---- FINISHED TUMOR CELL ANALYSIS ----
         · Differential_PROGENyDecoupleR_byCluster.csv
         · Differential_PAM50_byCluster.csv
         · Differential_CellCycle_byCluster.csv
-        · Differential_CellCycle_byCNA.csv
-        · Correlation_matrix_allScores.csv
+        · Differential_Copykat_byCluster.csv
+        · Correlation_matrix_allScores.png
     Generated plots:
         · DimPlot_UMAP_Annotated.png
         · Heatmap_Differential_PROGENy_byCluster.png
         · Heatmap_Differential_PROGENyDecoupleR_byCluster.png
         · Barplot_Differential_*.png
+        · Boxplot_PROGENy_by*.png
+        · UMAP_progeny_by*.png
+        · BarPlot_CopyKATPrediction_by*.png
+        · Boxplot_CopyKAT_CNA_byCluster.png
         · Scatter_*.png
         · Transition_celltype_beforeAfter_decontX.png
         "))

@@ -1,6 +1,6 @@
 ##
 ## Plotting functions for scRNA-seq Tumor Cell Annotation pipeline.
-## Source this file from 3g_seurat_tumor_analysis.R
+## Source this file from 3g_tumor_analysis.R
 ##
 
 library(ggplot2)
@@ -187,4 +187,106 @@ plot_celltype_transition <- function(object, results_path) {
 
   ggsave(paste0(results_path, "Transition_celltype_beforeAfter_decontX.png"), p,
          width = 10, height = 8, dpi = 300, bg = "white")
+}
+
+# ---------------------------------------------------------------
+# PROGENy pathway score distribution boxplots
+# ---------------------------------------------------------------
+plot_progeny_score_boxplots <- function(object, results_path) {
+  # Long table: one row per cell x pathway, carrying the cell's cluster
+  progeny_scores_df <- as.data.frame(t(as.matrix(GetAssayData(object, assay = "progeny", layer = "data"))))
+  progeny_scores_df$seurat_clusters <- object$seurat_clusters
+
+  progeny_long <- progeny_scores_df %>%
+    pivot_longer(cols = -seurat_clusters, names_to = "pathway", values_to = "score")
+
+  # One panel per pathway, clusters on the x axis
+  p_by_cluster <- ggplot(progeny_long, aes(x = seurat_clusters, y = score, fill = seurat_clusters)) +
+    geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3) +
+    facet_wrap(~pathway, scales = "free_y") +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 6),
+          legend.position = "none") +
+    labs(title = "PROGENy pathway score distribution by cluster",
+         x = "Cluster", y = "Score")
+
+  ggsave(paste0(results_path, "Boxplot_PROGENy_byCluster.png"), p_by_cluster,
+         width = 16, height = 12, dpi = 300, bg = "white")
+
+  # One panel per cluster, pathways on the x axis
+  p_by_pathway <- ggplot(progeny_long, aes(x = pathway, y = score, fill = pathway)) +
+    geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3) +
+    facet_wrap(~seurat_clusters, scales = "free_y") +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 90, hjust = 1, size = 6),
+          legend.position = "none") +
+    labs(title = "PROGENy pathway score distribution by pathway",
+         x = "Pathway", y = "Score")
+
+  ggsave(paste0(results_path, "Boxplot_PROGENy_byPathway.png"), p_by_pathway,
+         width = 16, height = 12, dpi = 300, bg = "white")
+}
+
+# ---------------------------------------------------------------
+# CopyKAT prediction composition bars (by sample and by cluster)
+# ---------------------------------------------------------------
+plot_copykat_composition <- function(object, results_path) {
+  meta <- object@meta.data
+
+  # Stacked proportion of CopyKAT calls (aneuploid / diploid / not defined) per sample
+  comp_by_sample <- meta %>%
+    group_by(orig.ident, copykat_prediction) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(orig.ident) %>%
+    mutate(pct = n / sum(n) * 100) %>%
+    ungroup()
+
+  p_sample <- ggplot(comp_by_sample, aes(x = orig.ident, y = pct, fill = copykat_prediction)) +
+    geom_col(position = "stack") +
+    theme_bw() +
+    theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = "CopyKAT prediction composition per sample",
+         x = "Sample", y = "% of cells", fill = "CopyKAT")
+
+  ggsave(paste0(results_path, "BarPlot_CopyKATPrediction_bySample.png"), p_sample,
+         width = 10, height = 6, dpi = 300, bg = "white")
+
+  # Same breakdown, one bar per Seurat cluster
+  comp_by_cluster <- meta %>%
+    group_by(seurat_clusters, copykat_prediction) %>%
+    summarise(n = n(), .groups = "drop") %>%
+    group_by(seurat_clusters) %>%
+    mutate(pct = n / sum(n) * 100) %>%
+    ungroup()
+
+  p_cluster <- ggplot(comp_by_cluster, aes(x = seurat_clusters, y = pct, fill = copykat_prediction)) +
+    geom_col(position = "stack") +
+    theme_bw() +
+    theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = "CopyKAT prediction composition per cluster",
+         x = "Cluster", y = "% of cells", fill = "CopyKAT")
+
+  ggsave(paste0(results_path, "BarPlot_CopyKATPrediction_byCluster.png"), p_cluster,
+         width = 10, height = 6, dpi = 300, bg = "white")
+}
+
+# ---------------------------------------------------------------
+# CopyKAT CNA burden distribution by cluster
+# ---------------------------------------------------------------
+plot_copykat_cna_boxplot <- function(object, results_path) {
+  meta <- object@meta.data
+  meta$copykat_cnas[is.na(meta$copykat_cnas)] <- 0  # cells with no CopyKAT call carry no CNAs
+
+  p <- ggplot(meta, aes(x = seurat_clusters, y = copykat_cnas, fill = seurat_clusters)) +
+    geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3) +
+    theme_bw() +
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "none") +
+    labs(title = "CopyKAT CNA distribution by cluster", x = "Cluster", y = "Number of CNAs")
+
+  ggsave(paste0(results_path, "Boxplot_CopyKAT_CNA_byCluster.png"), p,
+         width = 10, height = 6, dpi = 300, bg = "white")
 }
