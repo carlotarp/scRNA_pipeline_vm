@@ -1,6 +1,5 @@
 ##
-## Plotting functions for scRNA-seq SA pipeline
-## Source this file from the SA script.
+## Plotting functions for the clustering pipeline (2a, 2b, 3g).
 ##
 
 library(ggplot2)
@@ -9,6 +8,7 @@ library(dplyr)
 library(patchwork)
 library(networkD3)
 library(htmlwidgets)
+library(ggsci)
 
 # ---------------------------------------------------------------
 # Elbow plot with the chosen number of PCs (co3) marked
@@ -23,15 +23,29 @@ plot_elbow <- function(object, co3, results_path) {
 }
 
 # ---------------------------------------------------------------
-# Generic DimPlot
+# Generic DimPlot (wraps the legend into columns past 10 group_by levels)
 # ---------------------------------------------------------------
 plot_dimplot <- function(object, reduction, group_by, results_path, filename,
-                          label = FALSE) {
+                          label = FALSE, cols = NULL, legend_ncol = NULL,
+                          width = 8, height = 8) {
+  object[[group_by]] <- factor(object[[group_by]][, 1])
+  n_levels <- nlevels(object[[group_by]][, 1])
+
   p <- DimPlot(object, reduction = reduction, group.by = group_by,
-               label = label) +
+               cols = cols, label = label) +
     ggtitle(paste0(reduction, " - grouped by ", group_by))
 
-  ggsave(paste0(results_path, filename), p, width = 8, height = 8, dpi = 300)
+  if (n_levels > 10) {
+    ncol_legend <- if (!is.null(legend_ncol)) legend_ncol else ceiling(n_levels / 15)
+    p <- p +
+      guides(color = guide_legend(ncol = ncol_legend, override.aes = list(size = 3))) +
+      theme(legend.text = element_text(size = 8),
+            legend.title = element_text(size = 9),
+            legend.key.size = unit(0.4, "cm"))
+    width <- width + 1.5 * ncol_legend
+  }
+
+  ggsave(paste0(results_path, filename), p, width = width, height = height, dpi = 300)
 }
 
 # ---------------------------------------------------------------
@@ -51,7 +65,7 @@ plot_featureplot <- function(object, reduction, features, results_path, filename
 # Resolution grid search
 # ---------------------------------------------------------------
 plot_resolution_grid <- function(object, results_path,
-                                  reduction = "harmony",
+                                  reduction = "umap",
                                   resolutions = c(0.2, 0.4, 0.6, 0.8, 1.0)) {
 
   plot_list <- list()
@@ -64,7 +78,7 @@ plot_resolution_grid <- function(object, results_path,
     current_clusters <- Idents(object)
     n_clusters <- length(unique(current_clusters))
 
-    p <- DimPlot(object, reduction = "umap_decontX", label = TRUE) +
+    p <- DimPlot(object, reduction = reduction, label = TRUE) +
       ggtitle(paste0("resolution = ", res, "  (", n_clusters, " clusters)")) +
       theme(legend.position = "none")
     plot_list[[as.character(res)]] <- p
@@ -106,16 +120,19 @@ plot_resolution_grid <- function(object, results_path,
 }
 
 # ---------------------------------------------------------------
-# Cluster composition per sample / per subtype
+# Composition per sample / per subtype
 # ---------------------------------------------------------------
-plot_cluster_composition <- function(object, group_by, results_path, filename,
-                                      cluster_col = "seurat_clusters") {
+plot_composition <- function(object, group_by, results_path, filename,
+                             cluster_col = "seurat_clusters", colors = NULL) {
   df <- object@meta.data %>%
     dplyr::count(.data[[cluster_col]], .data[[group_by]])
 
+  fill_scale <- if (!is.null(colors)) scale_fill_manual(values = colors) else scale_fill_igv()
+
   p <- ggplot(df, aes(x = .data[[cluster_col]], y = n, fill = .data[[group_by]])) +
     geom_col() +
-    labs(title = paste0("Cluster composition by ", group_by),
+    fill_scale +
+    labs(title = paste0("Composition by ", group_by),
          x = "Cluster", y = "Number of cells") +
     theme_bw() +
     theme(panel.grid = element_blank(),
@@ -142,7 +159,7 @@ plot_vln_qc_by_group <- function(object, results_path, filename,
 }
 
 # ---------------------------------------------------------------
-# Diferential Expression Heatmap
+# Differential expression heatmap
 # ---------------------------------------------------------------
 
 plot_heatmap <- function(object, results_path, tumor_markers, n=10){

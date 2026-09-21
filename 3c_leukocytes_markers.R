@@ -1,8 +1,8 @@
 ##
-##  Single Cell Analysis Step 3b: Leukocyte annotation
-##  Runs AFTER 3a_lineage.R — takes lineage_annotated_data.rds as input.
-##  Subsets and reclusters leukocytes, assigns fine-grained cell types using
-##  marker dotplots, then transfers labels back to the full object.
+##  Single Cell Analysis Step 3c: Leukocyte marker plots
+##  Runs AFTER 3b_lineage_annotate.R — takes lineage_annotated_data.rds as input.
+##  Subsets and reclusters leukocytes, then produces the marker dotplots and
+##  cluster CSVs needed to fill in the dictionary in 3d_leukocytes_annotate.R.
 ##
 
 # Import libraries
@@ -10,15 +10,16 @@ library("Seurat")
 library(dplyr)
 
 # Set paths
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CA_path <- paste0(results_path, "GEMX/DecontX/CellAnnotation/")
+results_GEMX_CA_path <- paste0(results_path, "CellAnnotation/")
 results_GEMX_LCA_path <- paste0(results_GEMX_CA_path, "Leukocytes/")
 
 # Import plot functions and shared utilities
 source(paste0(wd, "CA_plots.R"))
+source(paste0(wd, "CL_plots.R"))
 source(paste0(wd, "utils.R"))
 
 # Load lineage annotated data
@@ -95,82 +96,20 @@ for (subtype in names(markers_leukocytes)){
                        group_by = "seurat_clusters")
 }
 
+# Markers of the clusters that the dotplots leave ambiguous
 clusters_to_check <- c("10", "11") # DecontX 7500
 find_markers_for_clusters(dwLeukocytes, clusters_to_check, results_GEMX_LCA_path)
-cat("\n Read Ambiguous Cluster CSV (if needed) to complete the annotation \n")
 
-# Manual cluster annotation
-#clusters_leuko_annotated <- c( #########  3500  #########
-#  "0" = "DC // TAM",  "1" = "TCell_naive",  "2" = "BCell",
-#  "3" = "TCell_cyto",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
-#  "6" = "TCell_ex",  "7" = "DC",  "8" = "Prolifetarive",
-#  "9" = "Mast",  "10" = "pDC",  "11" = "PlasmaBlast",
-#  "12" = "actDC",  "13" = "PlasmaBlast"
-#)
+# Export the reclustered leukocyte subset
+saveRDS(dwLeukocytes, file.path(results_GEMX_LCA_path, "leukocytes.rds"))
 
-#clusters_leuko_annotated <- c( #########  5500  #########
-#  "0" = "pDC",  "1" = "Tcell",  "2" = "BCell",
-#  "3" = "Tcell_naive",  "4" = "Fibrocyte",  "5" = "PlasmaBlast",
-#  "6" = "Tcell_ex",  "7" = "pDC",  "8" = "Proliferative",
-#  "9" = "Mast",  "10" = "TAM // Monocyte",  "11" = "pDC",
-#  "12" = "PlasmaBlast",  "13" = "actDC" , "14" = "PlasmaBlast"
-#)
-
-#clusters_leuko_annotated <- c( #########  7500  #########
-#  "0" = "pDC",  "1" = "Tcell_cyto",  "2" = "BCell",
-#  "3" = "Tcell_naive",  "4" = "PlasmaBlast",  "5" = "Tcell_ex",
-#  "6" = "Fibrocyte",  "7" = "pDC",  "8" = "Proliferative",
-#  "9" = "Mast",  "10" = "pDC",  "11" = "actDC",
-#  "12" = "PlasmaBlast"
-#)
-
-clusters_leuko_annotated <- c( #########  DecontX 7500  #########
-  "0" = "TAM",  "1" = "TCell_cyto",  "2" = "BCell",
-  "3" = "TCell_naive",  "4" = "PlasmaBlast",  "5" = "TCell_ex",
-  "6" = "cDC",  "7" = "TAM_fibro",  "8" = "Mast",
-  "9" = "pDC",  "10" = "Proliferative",  "11" = "TAM_proInflamm",
-  "12" = "actDC", "13" = "PlasmaBlast"
-)
-
-dwLeukocytes$celltype <- unname(clusters_leuko_annotated[as.character(dwLeukocytes$seurat_clusters)])
-dwLeukocytes$celltype <- factor(dwLeukocytes$celltype)
-
-# ---  Visualize Annotated Dimplot ---
-plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "celltype", label = T,
-             results_path = results_GEMX_LCA_path, filename = "DimPlot_UMAP_Leuko_Annotated.png")
-
-# --- Dimplot comparing contaminated vs decontaminated annotation ---
-plot_dimplot(dwLeukocytes, reduction = "umap", group_by = "celltype_cont", label = T,
-             results_path = results_GEMX_LCA_path, filename = "DimPlot_UMAP_LeukoContaminated.png")
-
-# Export annotated leukocyte data
-saveRDS(dwLeukocytes, file.path(results_path, paste0("leukocytes.rds")))
-
-# Label transfer to full object
-annotation_vec <- setNames(as.character(dwLeukocytes[["celltype"]][, 1]),
-                            colnames(dwLeukocytes))
-
-if ("celltype" %in% colnames(dwAnnotated@meta.data)) {
-  existing <- as.character(dwAnnotated[["celltype"]][, 1])
-} else {
-  existing <- rep(NA_character_, ncol(dwAnnotated))
-}
-names(existing) <- colnames(dwAnnotated)
-existing[names(annotation_vec)] <- annotation_vec
-dwAnnotated[["celltype"]] <- factor(existing)
-
-# ---  Visualize Annotated Dimplot ---
-plot_dimplot(dwAnnotated, reduction = "umap_decontX", group_by = "celltype", label = T,
-             results_path = results_GEMX_CA_path, filename = "DimPlot_UMAP_Leuko.png")
-
-# Export Annotated Data
-saveRDS(dwAnnotated, file.path(results_GEMX_CA_path, "leuko_annotated_data.rds"))
-
-cat(paste("\n ---- FINISHED LEUKOCYTE ANNOTATION ----
+cat(paste("\n ---- FINISHED LEUKOCYTE MARKER PLOTS ----
+    Review the dotplots and cluster CSVs, fill in `clusters_leuko_annotated`
+    at the top of 3d_leukocytes_annotate.R, then run it.
     Generated files:
-        · leukocytes.rds
-        · leuko_annotated_data.rds
+        · leukocytes.rds  (reclustered, not yet annotated)
+        · cluster_(cluster)_FindMarkers.csv
     Generated plots:
-        · DimPlot_UMAP_(groupedby).png
-        · DotPlot_(subtype).png
+        · DimPlot_UMAP_Leukocytes.png
+        · Dotplot_Leukocytes(subtype).png
         "))

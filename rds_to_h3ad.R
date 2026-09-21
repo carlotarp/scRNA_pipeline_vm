@@ -3,7 +3,7 @@
 ##
 
 # Set environment
-Sys.setenv(RETICULATE_PYTHON = "/home/usuario/miniconda3/envs/seurat5/bin/python")
+Sys.setenv(RETICULATE_PYTHON = "/home/user/miniconda3/envs/seurat5/bin/python")
 
 # Import Libraries
 library(reticulate)
@@ -13,8 +13,8 @@ library(scCustomize)
 library(qs)
 
 # Set Paths
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
 

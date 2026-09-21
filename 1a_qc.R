@@ -12,14 +12,14 @@ library(SingleCellExperiment)
 library("scDblFinder")
 
 # Set paths
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-cellranger_path <- "/home/usuario/DATASETS/scRNAseq/"
+cellranger_path <- ""
 GEMX_path <- paste0(cellranger_path, "260106_carlota_GEMX/2026_HN00264849/allPool/")
 data_path <- "_filtered_feature_barcode_matrix/"
-results_GEMX_QC_path <- paste0(results_path, "GEMX/QualityControl/")
+results_GEMX_QC_path <- paste0(results_path, "QualityControl/")
 
 # Import plot functions
 source(paste0(wd, "QC_plots.R"))

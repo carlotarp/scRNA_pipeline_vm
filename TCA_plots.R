@@ -1,6 +1,5 @@
 ##
-## Plotting functions for scRNA-seq Tumor Cell Annotation pipeline.
-## Source this file from 3g_tumor_analysis.R
+## Plotting functions for the tumor cluster analysis pipeline (3g, 4a).
 ##
 
 library(ggplot2)
@@ -33,45 +32,92 @@ plot_marker_tables <- function(results_path) {
 }
 
 # ---------------------------------------------------------------
-# PAM50 predicted vs clinical subtype concordance heatmap
+# Generic categorical x categorical transition/concordance tile heatmap
 # ---------------------------------------------------------------
-plot_pam50_concordance <- function(concordance_table, results_path) {
-  concordance_df <- as.data.frame(concordance_table) %>%
-    group_by(Predicted) %>%
-    mutate(pct = Freq / sum(Freq) * 100)
+plot_transition_heatmap <- function(counts_df, x_col, y_col, count_col = "n",
+                                     title, xlab, ylab, filename, results_path,
+                                     mode = c("gradient", "manual"),
+                                     fill_mode = c("count", "pct"),
+                                     label_mode = c("n", "n_pct"),
+                                     pct_group_col = y_col,
+                                     low_color = "white", high_color = "firebrick",
+                                     group_col = NULL, group_colors = NULL,
+                                     legend_name = "n cells",
+                                     text_size = 2.8, tile_border = "white",
+                                     width = 10, height = 8) {
+  mode <- match.arg(mode)
+  fill_mode <- match.arg(fill_mode)
+  label_mode <- match.arg(label_mode)
 
-  p <- ggplot(concordance_df, aes(x = Clinical, y = Predicted, fill = pct)) +
-    geom_tile(color = "white") +
-    geom_text(aes(label = paste0(Freq, "\n(", round(pct, 1), "%)")), size = 3.5) +
-    scale_fill_gradient(low = "white", high = "steelblue", name = "% of\npredicted") +
-    labs(title = "PAM50 predicted vs clinical Subtype concordance",
-         x = "Clinical Subtype", y = "PAM50 predicted") +
+  counts_df <- counts_df %>%
+    dplyr::group_by(.data[[pct_group_col]]) %>%
+    dplyr::mutate(.pct = round(.data[[count_col]] / sum(.data[[count_col]]) * 100, 1)) %>%
+    dplyr::ungroup()
+
+  counts_df$.label <- if (label_mode == "n_pct") {
+    paste0(counts_df[[count_col]], "\n(", counts_df$.pct, "%)")
+  } else {
+    counts_df[[count_col]]
+  }
+
+  if (mode == "manual") {
+    counts_df <- counts_df %>%
+      dplyr::group_by(.data[[group_col]]) %>%
+      dplyr::mutate(.scaled = (.data[[count_col]] - min(.data[[count_col]])) /
+                       (max(.data[[count_col]]) - min(.data[[count_col]]) + 0.001)) %>%
+      dplyr::ungroup() %>%
+      dplyr::rowwise() %>%
+      dplyr::mutate(.tile_color = colorRampPalette(c("white", group_colors[[.data[[group_col]]]]))(100)[round(.scaled * 99) + 1]) %>%
+      dplyr::ungroup()
+
+    p <- ggplot(counts_df, aes(x = .data[[x_col]], y = .data[[y_col]], fill = .tile_color)) +
+      geom_tile(color = tile_border) +
+      geom_text(aes(label = .label), size = text_size) +
+      scale_fill_identity()
+  } else {
+    fill_col <- if (fill_mode == "pct") ".pct" else count_col
+    p <- ggplot(counts_df, aes(x = .data[[x_col]], y = .data[[y_col]], fill = .data[[fill_col]])) +
+      geom_tile(color = tile_border) +
+      geom_text(aes(label = .label), size = text_size) +
+      scale_fill_gradient(low = low_color, high = high_color, name = legend_name)
+  }
+
+  p <- p +
     theme_minimal() +
-    theme(panel.grid = element_blank())
+    theme(panel.grid = element_blank(),
+          axis.text.x = element_text(angle = 45, hjust = 1),
+          plot.background = element_rect(fill = "white", color = NA)) +
+    labs(title = title, x = xlab, y = ylab)
 
-  ggsave(paste0(results_path, "Heatmap_PAM50_vs_ClinicalSubtype.png"), p,
-         width = 7, height = 5, dpi = 300, bg = "white")
+  ggsave(paste0(results_path, filename), p, width = width, height = height, dpi = 300, bg = "white")
 }
 
 # ---------------------------------------------------------------
-# PAM50 composition stacked bars, faceted by clinical subtype
+# Predicted-subtype composition stacked bars per sample, faceted by Subtype
 # ---------------------------------------------------------------
-plot_pam50_composition_facet <- function(object, results_path) {
-  composition_df <- object@meta.data %>%
-    group_by(orig.ident, PAM50_predicted, Subtype) %>%
-    summarise(n = n(), .groups = "drop") %>%
-    group_by(orig.ident, Subtype)
+plot_subtype_composition_facet <- function(object, results_path, call_col = "PAM50_predicted",
+                                           facet_col = "Subtype", label = call_col, filename = NULL,
+                                           colors = NULL) {
+  if (is.null(filename)) {
+    filename <- paste0("Composition_", call_col, "_bySample_facet", facet_col, ".png")
+  }
 
-  p <- ggplot(composition_df, aes(x = orig.ident, y = n, fill = PAM50_predicted)) +
+  composition_df <- object@meta.data %>%
+    group_by(orig.ident, .data[[call_col]], .data[[facet_col]]) %>%
+    summarise(n = n(), .groups = "drop")
+
+  fill_scale <- if (!is.null(colors)) scale_fill_manual(values = colors) else scale_fill_discrete()
+
+  p <- ggplot(composition_df, aes(x = orig.ident, y = n, fill = .data[[call_col]])) +
     geom_col(position = "stack") +
-    facet_wrap(~Subtype, scales = "free_x") +
+    fill_scale +
+    facet_wrap(vars(.data[[facet_col]]), scales = "free_x") +
     theme_bw() +
     theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
-    labs(title = "PAM50 predicted composition per sample, by clinical subtype",
-         x = "Sample", y = "Number of cells", fill = "PAM50 predicted")
+    labs(title = paste0(label, " composition per sample, by clinical ", facet_col),
+         x = "Sample", y = "Number of cells", fill = label)
 
-  ggsave(paste0(results_path, "Composition_PAM50_bySample_facetSubtype.png"), p,
-         width = 12, height = 6, dpi = 300, bg = "white")
+  ggsave(paste0(results_path, filename), p, width = 12, height = 6, dpi = 300, bg = "white")
 }
 
 # ---------------------------------------------------------------
@@ -92,6 +138,64 @@ plot_cellcycle_boxplot <- function(object, results_path) {
 
   ggsave(paste0(results_path, "CellCycle_scores_boxplot_byCluster_facetSubtype.png"), p,
          width = 12, height = 6, dpi = 300, bg = "white")
+}
+
+# ---------------------------------------------------------------
+# Generic score-distribution boxplot: x = cluster_col, y = score
+# ---------------------------------------------------------------
+plot_score_boxplot <- function(object, score_cols, results_path, filename,
+                               cluster_col = "seurat_clusters", fill_col = NULL,
+                               fill_labels = NULL, facet_col = NULL,
+                               title, y_lab = "Score", colors = NULL) {
+  select_cols <- unique(c(cluster_col, score_cols, fill_col, facet_col))
+
+  score_long <- object@meta.data %>%
+    select(all_of(select_cols)) %>%
+    pivot_longer(cols = all_of(score_cols), names_to = "score_type", values_to = "score")
+
+  if (is.null(fill_col) && !is.null(fill_labels)) {
+    score_long$score_type <- unname(fill_labels[score_long$score_type])
+  }
+
+  fill_aes <- if (!is.null(fill_col)) fill_col else "score_type"
+
+  p <- ggplot(score_long, aes(x = .data[[cluster_col]], y = score, fill = .data[[fill_aes]])) +
+    geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3, position = position_dodge(width = 0.8)) +
+    theme_bw() +
+    theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1)) +
+    labs(title = title, x = "Cluster", y = y_lab, fill = if (!is.null(fill_col)) fill_col else "Score type")
+
+  if (!is.null(facet_col)) p <- p + facet_wrap(vars(.data[[facet_col]]), scales = "free_x")
+  if (!is.null(colors)) p <- p + scale_fill_manual(values = colors)
+
+  ggsave(paste0(results_path, filename), p, width = 12, height = 6, dpi = 300, bg = "white")
+}
+
+# ---------------------------------------------------------------
+# Cell type/call proportion barplot (mean +/- SEM, sample points overlaid)
+# ---------------------------------------------------------------
+plot_celltype_proportions_bar <- function(prop_df, x_var, results_path, filename,
+                                          celltype_col = "celltype", colors = NULL,
+                                          ncol_facets = 5) {
+  summary_df <- prop_df %>%
+    group_by(.data[[x_var]], .data[[celltype_col]]) %>%
+    summarise(mean_prop = mean(proportion), sem = sd(proportion) / sqrt(n()), .groups = "drop")
+
+  fill_scale <- if (!is.null(colors)) scale_fill_manual(values = colors) else scale_fill_discrete()
+
+  p <- ggplot(summary_df, aes(x = .data[[x_var]], y = mean_prop, fill = .data[[x_var]])) +
+    geom_col(alpha = 0.8) +
+    geom_errorbar(aes(ymin = mean_prop - sem, ymax = mean_prop + sem), width = 0.2) +
+    geom_jitter(data = prop_df, aes(x = .data[[x_var]], y = proportion), inherit.aes = FALSE,
+               width = 0.15, height = 0, size = 1, alpha = 0.5, color = "black") +
+    facet_wrap(as.formula(paste("~", celltype_col)), scales = "free_y", ncol = ncol_facets) +
+    fill_scale +
+    labs(x = x_var, y = "Cell proportion (mean ± SEM)", fill = x_var) +
+    theme_bw(base_size = 11) +
+    theme(panel.grid = element_blank(), axis.text.x = element_text(angle = 45, hjust = 1),
+         strip.text = element_text(face = "bold"))
+
+  ggsave(paste0(results_path, filename), p, width = 14, height = 10, dpi = 300, bg = "white")
 }
 
 # ---------------------------------------------------------------
@@ -119,8 +223,8 @@ plot_differential_barplot <- function(csv_path, feature_col, title, filename, re
     geom_col() +
     facet_wrap(~cluster) +
     scale_fill_gradient2(low = "firebrick", mid = "white", high = "forestgreen", midpoint = 0,
-                         name = "Diff. vs\nrest") +
-    coord_flip() +
+                         limits = c(-1, 1), na.value = "white", name = "Diff. vs\nrest") +
+    coord_flip(ylim = c(-1, 1)) +
     theme_bw() + theme(panel.grid = element_blank()) +
     labs(title = title, x = NULL, y = "avg_diff (cluster vs rest)")
 
@@ -158,36 +262,6 @@ plot_correlation_scatter <- function(data, var1, var2, results_path) {
          width = 6, height = 5, dpi = 300, bg = "white")
 }
 
-# ---------------------------------------------------------------
-# Celltype transition tile plot (before vs after DecontX correction)
-# ---------------------------------------------------------------
-plot_celltype_transition <- function(object, results_path) {
-  transition_df <- data.frame(
-    cell = colnames(object),
-    celltype_before = as.character(object$celltype_cont),
-    celltype_after = as.character(object$celltype)
-  )
-
-  trans_counts <- transition_df %>%
-    dplyr::count(celltype_before, celltype_after, name = "n") %>%
-    dplyr::group_by(celltype_before) %>%
-    dplyr::mutate(pct = round(n / sum(n) * 100, 1)) %>%
-    dplyr::ungroup()
-
-  p <- ggplot(trans_counts, aes(x = celltype_after, y = celltype_before, fill = pct)) +
-    geom_tile(color = "white") +
-    geom_text(aes(label = pct), size = 2.8) +
-    scale_fill_gradient(low = "white", high = "firebrick", name = "% of\nbefore") +
-    theme_minimal() +
-    theme(panel.grid = element_blank(),
-          axis.text.x = element_text(angle = 45, hjust = 1),
-          plot.background = element_rect(fill = "white", color = NA)) +
-    labs(title = "Celltype transition (%): before (celltype_cont) vs after (celltype, DecontX)",
-         x = "Celltype after DecontX", y = "Celltype before DecontX")
-
-  ggsave(paste0(results_path, "Transition_celltype_beforeAfter_decontX.png"), p,
-         width = 10, height = 8, dpi = 300, bg = "white")
-}
 
 # ---------------------------------------------------------------
 # PROGENy pathway score distribution boxplots
@@ -273,20 +347,22 @@ plot_copykat_composition <- function(object, results_path) {
 }
 
 # ---------------------------------------------------------------
-# CopyKAT CNA burden distribution by cluster
+# Chromosomal instability (CIN_score/PGA_score) distribution by cluster
 # ---------------------------------------------------------------
-plot_copykat_cna_boxplot <- function(object, results_path) {
-  meta <- object@meta.data
-  meta$copykat_cnas[is.na(meta$copykat_cnas)] <- 0  # cells with no CopyKAT call carry no CNAs
+plot_copykat_cna_boxplot <- function(object, results_path, score_col = "CIN_score",
+                                     y_lab = "CIN score (SD of CNA profile)", filename = NULL) {
+  meta <- object@meta.data[!is.na(object@meta.data[[score_col]]), ]
 
-  p <- ggplot(meta, aes(x = seurat_clusters, y = copykat_cnas, fill = seurat_clusters)) +
+  if (is.null(filename)) filename <- paste0("Boxplot_", score_col, "_byCluster.png")
+
+  p <- ggplot(meta, aes(x = seurat_clusters, y = .data[[score_col]], fill = seurat_clusters)) +
     geom_boxplot(outlier.size = 0.3, outlier.alpha = 0.3) +
     theme_bw() +
     theme(panel.grid = element_blank(),
           axis.text.x = element_text(angle = 45, hjust = 1),
           legend.position = "none") +
-    labs(title = "CopyKAT CNA distribution by cluster", x = "Cluster", y = "Number of CNAs")
+    labs(title = paste0(score_col, " distribution by cluster"), x = "Cluster", y = y_lab)
 
-  ggsave(paste0(results_path, "Boxplot_CopyKAT_CNA_byCluster.png"), p,
+  ggsave(paste0(results_path, filename), p,
          width = 10, height = 6, dpi = 300, bg = "white")
 }

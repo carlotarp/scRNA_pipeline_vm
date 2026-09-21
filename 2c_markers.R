@@ -1,7 +1,8 @@
 ##
-##  Single Cell Analysis Step 2b: Cluster Marker Genes
-##  Runs AFTER 2_seurat_clustering.R — takes clustered_data.rds as input.
-##  Separated because FindAllMarkers is slow; run once and keep the output.
+##  Single Cell Analysis Step 2c: Cluster Marker Genes
+##  Runs AFTER 2b_cluster.R — takes clustered_data.rds as input.
+##  Computes FindAllMarkers per cluster (slow, kept as a separate step) and
+##  a heatmap of the top marker genes.
 ##
 
 # Import libraries
@@ -9,11 +10,11 @@ library("Seurat")
 library(dplyr)
 
 # Set paths
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CL_path <- paste0(results_path, "GEMX/DecontX/Clustering/")
+results_GEMX_CL_path <- paste0(results_path, "Clustering/")
 
 # Import plot functions
 source(paste0(wd, "CL_plots.R"))
@@ -32,6 +33,7 @@ cat("\n Differential expression per cluster done \n")
 plot_heatmap(dwIntegrated, results_GEMX_CL_path, tumor_markers_all, n = 10)
 
 cat(paste("\n ---- FINISHED CLUSTER MARKER GENES ----
+    Run 3a_lineage_markers.R next.
     Generated files:
       · all_tumor_markers.tsv
     Generated plots:

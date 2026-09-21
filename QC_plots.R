@@ -1,6 +1,5 @@
 ##
-## Plotting functions for scRNA-seq Quality Control pipeline
-## Source this file from 1a_seurat_quality_control.R .
+## Plotting functions for the quality control pipeline (1a, 1b).
 ##
 
 library(ggplot2)

@@ -1,8 +1,5 @@
 ##
 ##  Single Cell Analysis Step 1c: DecontX contamination correction
-##  Runs AFTER 1b_integrate.R — takes sample_annotated_data.rds as input.
-##  Per sample, runs DecontX on already QC'd cells and attaches the corrected
-##  counts as a new "RNA_decontX" assay. The original "RNA" assay is untouched.
 ##
 
 # Import libraries
@@ -13,12 +10,12 @@ library(harmony)
 library(ggplot2)
 
 # Set paths
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_QC_path <- paste0(results_path, "GEMX/QualityControl/7500/")
-results_GEMX_DECONTX_path <- paste0(results_path, "GEMX/DecontX/")
+results_GEMX_QC_path <- paste0(results_path, "QualityControl/")
+results_GEMX_DECONTX_path <- results_path
 
 # Import plot functions
 source(paste0(wd, "DECONTX_plots.R"))
@@ -107,7 +104,7 @@ plot_decontx_hist(gene_change_df, results_GEMX_DECONTX_path)
 plot_decontx_dumbbell(gene_change_df, results_GEMX_DECONTX_path)
 
 cat(paste("\n ---- FINISHED DECONTX CORRECTION ----
-    Run 2a_cluster.R next.
+    Run 2a_resolution.R next.
     Generated files:
         · decontx_data.rds  (RNA + RNA_decontX assays, Harmony integration on decontX)
     Generated plots:

@@ -1,8 +1,8 @@
 ##
-##  Single Cell Analysis Step 2a: Clustering
-##  Runs AFTER 1c_decontx.R — takes decontx_data.rds as input.
-##  Finds optimal PCs and resolution, generates UMAP and clusters,
-##  then exports tables and a clustered_data.rds for downstream annotation.
+##  Single Cell Analysis Step 2b: Clustering
+##  Runs AFTER 2a_resolution.R — takes decontx_data.rds as input.
+##  Runs UMAP and clustering at the resolution chosen from the grid in 2a,
+##  and exports clustered_data.rds.
 ##
 
 # Import libraries
@@ -12,49 +12,57 @@ library(tibble)
 library(Matrix)
 
 # Set paths
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-results_GEMX_CL_path <- paste0(results_path, "GEMX/DecontX/Clustering/")
+results_GEMX_CL_path <- paste0(results_path, "Clustering/")
 
 # Import plot functions
 source(paste0(wd, "CL_plots.R"))
 
-# Load sample annotated data
-dwIntegrated <- readRDS(paste0(results_path, "GEMX/QualityControl/7500/sample_annotated_data.rds"))
-cat(" Annotated Sample Data Loaded \n")
+# Clustering resolution chosen from ResolutionGrid.png (2a_resolution.R)
+res <- 0.5
 
-# Find optimal number of PCs
-# co1: first PC where cumulative variance > 90% AND individual contribution < 5%
-# co2: last PC before a drop > 0.1% (elbow of the variance curve)
-# co3: conservative cutoff — the lesser of co1 and co2
-pct <- dwIntegrated[["pca_decontX"]]@stdev / sum(dwIntegrated[["pca_decontX"]]@stdev) * 100
-cumu <- cumsum(pct)
-co1 <- which(cumu > 90 & pct < 5)[1]
-co2 <- sort(which((pct[1:length(pct) - 1] - pct[2:length(pct)]) > 0.1), decreasing = TRUE)[1] + 1
-co3 <- min(co1, co2)
-cat(paste("\n The Optimal number of PCs is", co3, "\n")) # 12
+# Load DecontX-corrected data (output of 1c_decontx.R)
+dwIntegrated <- readRDS(paste0(results_path, "decontx_data.rds"))
+cat(" DecontX data loaded \n")
 
-# --- Elbow plot to visualize co3 ---
-plot_elbow(dwIntegrated, co3, results_GEMX_CL_path)
+# Optimal number of PCs (same criterion as 2a_resolution.R), per reduction
+optimal_pcs <- function(object, reduction) {
+  pct <- object[[reduction]]@stdev / sum(object[[reduction]]@stdev) * 100
+  cumu <- cumsum(pct)
+  co1 <- which(cumu > 90 & pct < 5)[1]
+  co2 <- sort(which((pct[1:length(pct) - 1] - pct[2:length(pct)]) > 0.1), decreasing = TRUE)[1] + 1
+  min(co1, co2)
+}
+
+co3 <- optimal_pcs(dwIntegrated, "pca_decontX")
+co3_rna <- optimal_pcs(dwIntegrated, "pca")
+cat(paste("\n Optimal PCs: ", co3, " (RNA_decontX), ", co3_rna, " (RNA) \n"))
+
+# Uncorrected (pre-DecontX) baseline on the RNA assay: same criterion and same
+# resolution as the DecontX branch below, but its own assay, PCs, reduction and
+# graph, so neither run overwrites the other's neighbour graph.
+dwIntegrated <- RunUMAP(dwIntegrated, reduction = "harmony", dims = 1:co3_rna,
+                        assay = "RNA", reduction.name = "umap")
+dwIntegrated <- FindNeighbors(dwIntegrated, reduction = "harmony", dims = 1:co3_rna,
+                              assay = "RNA", graph.name = c("RNA_nn", "RNA_snn"))
+dwIntegrated <- FindClusters(dwIntegrated, resolution = res, graph.name = "RNA_snn",
+                             cluster.name = "contaminated_clusters")
+cat("\n Uncorrected (RNA) baseline UMAP and clusters generated \n")
 
 # Generate UMAP
-dwIntegrated <- RunUMAP(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3, reduction.name = "umap_decontX")
+dwIntegrated <- RunUMAP(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3,
+                        assay = "RNA_decontX", reduction.name = "umap_decontX")
 cat("\n UMAP Generated \n")
 
-# Find optimal clustering resolution
-dwIntegrated <- FindNeighbors(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3)
-plot_resolution_grid(dwIntegrated, results_path = results_GEMX_CL_path,
-                          reduction = "harmony_decontX",
-                          resolutions = c(0.2, 0.3, 0.4, 0.5))
-res <- 0.5
-cat(paste("\n The Optimal Resolution is", res, "\n"))
-
 # Generate clusters
-dwIntegrated <- FindClusters(dwIntegrated, resolution = res, cluster.name = "decontX_clusters")
-cat("\n Clusters Generated w/ Optimal Resolution \n")
-
+dwIntegrated <- FindNeighbors(dwIntegrated, reduction = "harmony_decontX", dims = 1:co3,
+                              assay = "RNA_decontX", graph.name = c("RNA_decontX_nn", "RNA_decontX_snn"))
+dwIntegrated <- FindClusters(dwIntegrated, resolution = res, graph.name = "RNA_decontX_snn",
+                             cluster.name = "decontX_clusters")
+cat(paste("\n Clusters Generated w/ resolution", res, "\n"))
 
 # --- Visualize integrated PCA ---
 plot_dimplot(dwIntegrated, reduction = "harmony_decontX", group_by = "Subtype",
@@ -81,9 +89,9 @@ write.table(dwIntegrated@meta.data,file=paste0(results_GEMX_CL_path,'clustered_m
 cat("\n Tables of Interest Writen \n")
 
 # --- Visualize cluster composition ---
-plot_cluster_composition(dwIntegrated, group_by = "orig.ident",
+plot_composition(dwIntegrated, group_by = "orig.ident",
                           results_path = results_GEMX_CL_path, filename = "ClusterComposition_bySample.png")
-plot_cluster_composition(dwIntegrated, group_by = "Subtype",
+plot_composition(dwIntegrated, group_by = "Subtype",
                           results_path = results_GEMX_CL_path, filename = "ClusterComposition_bySubtype.png")
 
 # --- Quality control plots ---
@@ -139,7 +147,7 @@ rm(count_matrix)
 cat("\n RNA expression table generated \n")
 
 cat(paste("\n ---- FINISHED CLUSTERING ----
-    Run 2b_markers.R next to compute FindAllMarkers (slow step, separate script).
+    Run 2c_markers.R next to compute FindAllMarkers (slow step, separate script).
     Generated files:
       · cells_per_cluster.tsv
       · umap_pvalues.tsv
@@ -148,9 +156,6 @@ cat(paste("\n ---- FINISHED CLUSTERING ----
       · clustered_data.rds
       · umi.tsv
     Generated plots:
-      · ElbowPlot.png
-      · ResolutionGrid.png
-      · SankeyPlot.html
       · DimPlot_(reduction)_(groupedby).png
       · FeaturePlot_(reduction)_(features).png
       · ClusterComposition_(groupedby).png

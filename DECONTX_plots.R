@@ -1,6 +1,5 @@
 ##
-## Plotting functions for the DecontX contamination-correction step.
-## Source this file from 1b_decontx_quality_control.R
+## Plotting functions for the DecontX contamination-correction step (1c).
 ##
 
 library(ggplot2)

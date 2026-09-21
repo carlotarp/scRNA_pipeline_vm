@@ -10,8 +10,8 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
 results_COMPARE_path <- paste0(results_path, "GEMX/FullCutoffComparison/")

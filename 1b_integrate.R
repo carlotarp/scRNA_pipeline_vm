@@ -10,12 +10,12 @@ library(dplyr)
 library(tibble)
 
 # Set paths
-project_path <- "/home/usuario/PROJECTS/260724_victor_scRNA/"
-wd <- paste0(project_path, "codes/scRNA_pipeline/")
+project_path <- "/home/user/PROJECTS/scRNA_vmendez/"
+wd <- paste0(project_path, "codes/")
 setwd(wd)
 results_path <- paste0(project_path, "results/")
-cellranger_path <- "/home/usuario/DATASETS/scRNAseq/"
-results_GEMX_QC_path <- paste0(results_path, "GEMX/QualityControl/")
+cellranger_path <- ""
+results_GEMX_QC_path <- paste0(results_path, "QualityControl/")
 
 # Import plot functions
 source(paste0(wd, "QC_plots.R"))
@@ -56,11 +56,14 @@ plot_dimplot_by_sample(dwIntegrated, reduction = "harmony", results_path = resul
 annot_file <- paste0(cellranger_path, "260106_carlota_GEMX/Samples_scRNAseq_GEMX-Flex.csv")
 annot_df <- read.csv(annot_file, stringsAsFactors = FALSE)
 annot_df <- annot_df %>%
-    select(scRNAseq_ID, Subtype) %>%
+    select(scRNAseq_ID, Subtype, IGGscale_annot, pCR, TLS) %>%
     distinct() %>%
     mutate(
         scRNAseq_ID = as.character(scRNAseq_ID),
-        Subtype = as.character(Subtype)
+        Subtype = as.character(Subtype),
+        IGG = as.character(IGGscale_annot),
+        pCR = as.character(pCR),
+        TLS = as.character(TLS)
     )
 
 # --- Percentage of cells filtered per sample, colored by tumor subtype ---
