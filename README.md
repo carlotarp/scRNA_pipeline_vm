@@ -37,7 +37,9 @@ CellRanger output
       │                     → tumoral_annotated.rds / fully_annotated_data.rds
       │
 4a_clinical_analysis.R      Celltype composition heatmaps + IGG scoring +
-                            clinical covariate association (Subtype/pCR/IGG/TLS)
+                            clinical covariate association (Subtype/pCR/IGG/TLS/TLS_binary):
+                            composition heatmaps, chi-square/Cramer's V, proportion boxplots
+                            (with Wilcoxon significance brackets), Spearman proportion correlation
 ```
 
 > **Manual decision points** — all live at the top of the corresponding `_annotate` script (or `2b_cluster.R`), filled in from the previous script's plots:
@@ -50,15 +52,6 @@ CellRanger output
 > | `3f_stroma_annotate.R` | `clusters_Stroma_annotated` | dotplots + cluster CSVs (3e) |
 > | `3j_tumor_annotate.R` | `clusters_tumor_annotated`, `noise_decontX_clusters`, `noise_tumor_clusters` | validation plots + cluster CSVs (3i) |
 
-> **Not tracked in this repo (`.gitignore`):** several exploratory/personal scripts and notebooks exist locally but are gitignored, so they won't appear if you clone the repo fresh: the 3 notebooks below, `colagen.R`, `cutoff_comparison.R`, and `marti_gene_expression_analysis.R` (FGFR4/EGFR/ERBB2 vs CEACAM6 expression study, formerly the tracked `4b_gene_expression_analysis.R` step — now a personal/local analysis, not part of the numbered pipeline).
-
-**Notebooks** (independent, each requires its own conda environment; all 3 are gitignored — local only):
-
-| Notebook | Tool | Environment | Purpose |
-|---|---|---|---|
-| `3y_compocyte_cell_annotation.ipynb` | Compocyte | `compocyte_only` | Pretrained TIL hierarchical classifier |
-| `3z_scMalignant_cell_annotation.ipynb` | scMalignantFinder | `scmalignant` | Malignancy probability per cell |
-| `liana_cell_communication.ipynb` | LIANA | `decoupler_liana` | Cell-cell communication, chord diagrams |
 
 ---
 
@@ -89,10 +82,11 @@ scRNA_pipeline_vm/
 ├── Plot functions (sourced by pipeline scripts)
 │   ├── QC_plots.R          → used by 1a, 1b
 │   ├── DECONTX_plots.R     → used by 1c
-│   ├── CL_plots.R          → used by 2a–2c, 3g, 3i, 3j
-│   ├── CA_plots.R          → used by 3a–3h
+│   ├── CL_plots.R          → used by 2a–2c, 3g–3j (plot_dimplot, plot_featureplot, plot_composition, ...)
+│   ├── CA_plots.R          → used by 3a–3h (plot_marker_dotplot)
 │   ├── TCA_plots.R         → used by 3i, 3j, 4a (transition heatmaps, score boxplots, composition facets)
-│   └── Clinical_plots.R    → used by 4a (clinical covariate association barplots, celltype proportions)
+│   └── Clinical_plots.R    → used by 4a (generate_heatmap, clinical covariate association barplots,
+│                            celltype proportion boxplots with significance brackets)
 │
 ├── Gene signatures
 │   └── scsubtype_signatures.R   Basal_SC / Her2E_SC / LumA_SC / LumB_SC gene lists (Wu et al. 2021)
@@ -100,21 +94,17 @@ scRNA_pipeline_vm/
 ├── Shared utilities
 │   └── utils.R             color palettes, generate_lineage_subset(), find_markers_for_clusters(),
 │                            compute_scsubtype_scores(), differential_scores_by_cluster(),
-│                            association_stats(), proportion_correlation(), compute_celltype_proportions()
+│                            proportion_correlation(), compute_celltype_proportions(),
+│                            read_copykat_outputs() (3g: reads copyKAT's per-sample prediction +
+│                            CNA files back from disk after the loop, instead of holding them in
+│                            memory throughout)
 │
 ├── Environment
 │   └── seurat5.yml         conda env spec for the R/Seurat side of the pipeline
 │
-├── Auxiliary scripts
-│   └── rds_to_h3ad.R              Convert Seurat .rds → .h5ad for Python notebooks
-│
-└── Not tracked (.gitignore) — local/exploratory, not part of the shared repo
-    ├── 3y_compocyte_cell_annotation.ipynb
-    ├── 3z_scMalignant_cell_annotation.ipynb
-    ├── liana_cell_communication.ipynb
-    ├── colagen.R                          Collagen gene distribution analysis
-    ├── cutoff_comparison.R                QC threshold exploration
-    └── marti_gene_expression_analysis.R   FGFR4/EGFR/ERBB2 vs CEACAM6 expression study
+└── Auxiliary scripts
+    └── rds_to_h3ad.R              Convert Seurat .rds → .h5ad for Python notebooks
+
 ```
 
 ---
@@ -130,20 +120,11 @@ scRNA_pipeline_vm/
 | celda | — | DecontX contamination correction |
 | scDblFinder | — | Doublet detection |
 | progeny | — | Pathway activity scoring |
-| decoupleR | — | Pathway activity scoring (MLM) |
 | copykat | — | CNV-based ploidy prediction |
 | dplyr, tibble, tidyr | — | Data wrangling |
 | ggplot2, corrplot, gt | — | Visualisation |
 | Matrix | — | Sparse matrix operations |
 | reticulate | — | R–Python bridge (rds_to_h3ad.R) |
-
-### Python environments
-
-| Environment | Key packages |
-|---|---|
-| `compocyte_only` | Compocyte, scanpy, anndata, pandas |
-| `scmalignant` | scMalignantFinder, scanpy, pandas, matplotlib |
-| `decoupler_liana` | liana, scanpy, pycirclize, pandas, matplotlib |
 
 ---
 
@@ -157,18 +138,6 @@ wd <- paste0(project_path, "codes/scRNA_pipeline/")
 ```
 
 Run scripts sequentially following the pipeline order. Each script prints a summary of generated files on completion.
-
-For the notebooks, activate the corresponding conda environment first:
-
-```bash
-conda activate compocyte_only
-jupyter notebook 3y_compocyte_cell_annotation.ipynb
-
-conda activate decoupler_liana
-jupyter notebook liana_cell_communication.ipynb
-```
-
-The notebooks consume `.h5ad` files; use `rds_to_h3ad.R` to convert Seurat objects when needed.
 
 ---
 

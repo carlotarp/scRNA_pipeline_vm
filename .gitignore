@@ -1,5 +1,5 @@
 .idea/
-githubtoken.txt
+.gitignore
 liana_cell_communication.ipynb
 3y_compocyte_cell_annotation.ipynb
 3z_scMalignant_cell_annotation.ipynb
