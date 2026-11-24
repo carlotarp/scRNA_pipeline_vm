@@ -35,7 +35,7 @@ Steps: 01 DecontX+QC (per sample, then merge) → 02 resolution evidence → 03 
   Write the proposed dictionary to the file anyway so they can edit it directly.
 - **Autonomous** (only when the user says so: "auto", "hazlo todo tú", "no me preguntes"). Decide, record and
   continue. Still stop and ask when: a decision would DROP > 10 % of the cells of a step, a sample fails QC
-  badly (see `references/qc_and_ambient.md`), CopyKAT would start (hours of compute, ~45 GB per sample), or the
+  badly (see `references/qc_and_ambient.md`), CopyKAT would start (long and memory-hungry), or the
   machine lacks RAM. Flag every uncertain call in the run notes so the human can review them afterwards.
 
 Mention the mode you are in at the start, and how to switch.

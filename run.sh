@@ -108,6 +108,7 @@ while IFS=$'\t' read -r id script kind args mem parallel_key; do
   case "$id" in ''|\#*) continue ;; esac
   in_range "$id" || continue
   [ "$args" = "-" ] && args=""
+  case "$mem" in resources.*) mem=$(cfg "$mem" -) ;; esac   # mem_max may name a config key
   if [ "$kind" = per_sample ]; then
     par=$(cfg "$parallel_key" 4); cores=$(cfg resources.copykat_cores 4)
     echo "[$id] $script $args  (per sample, $par in parallel)"

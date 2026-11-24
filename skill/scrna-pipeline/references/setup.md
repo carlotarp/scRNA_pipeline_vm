@@ -23,10 +23,13 @@
    Copy a decision from a previous run only if the user asks for an identical re-run.
 3. Dry check: `pipeline/run.sh --status` (creates the run folder), then `pipeline/run.sh --to 02`.
 4. Small first: when testing changes, run on 2-3 downsampled samples (1,500 cells each) in a scratch results
-   folder; the full cohort (16 samples) takes ~1 h to step 12 and CopyKAT hours.
+   folder, and read its `timings.tsv` before launching the full cohort.
 
-## Resources (reference cohort: 16 samples, ~180k droplets called, ~145k cells after QC)
-- 01 per sample: ~2-4 GB each, 16 in parallel. Merge and clustering: tens of GB (counts stay on disk with BPCells).
-- 13 CopyKAT: 1-10 h per sample, up to ~45 GB each (`MemoryMax` per job), 5 in parallel by default.
-- 14 CopyKAT analysis peaked at ~220 GB on the full cohort: run it alone.
+## Resources
+- Time and memory depend on the cohort and the machine: measure them on a small run (`timings.tsv`: wall time
+  and peak RAM per sub-step) and scale up.
+- Per-sample steps (01, 13) run in parallel: `resources.max_parallel_samples`, `resources.max_parallel_copykat`.
+  CopyKAT (13) is the slowest and most memory-hungry step; cap each job with `resources.copykat_memory_max`
+  (enforced with `systemd-run` when available) and set `resources.copykat_cores`. Step 14 holds every
+  sample's CNA profile at once: run it alone.
 - If other heavy jobs share the machine, lower `resources.max_parallel_*` instead of risking OOM kills.

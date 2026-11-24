@@ -20,10 +20,10 @@
 | 17 `<study> <mode>` | sub-population study (config `subpopulations.<study>`): check, profile, zoom, signatures, ambient per sample, joint, summary | study decisions, zoom resolution |
 | 18 `<study>` | applies the study dictionary to the full object → `output_object` | dictionary `<study>` |
 
-Why these parameters (reference run, decided with the user): 3 MAD instead of the old ±2 SD (2 SD discarded
+Why these parameters (chosen while developing the pipeline): 3 MAD instead of the old ±2 SD (2 SD discarded
 ~5 % of every sample, mostly large dividing/Lum_Her2 tumour cells; 3 vs 5 MAD barely differ); 30 PCs at every
 level (the automatic elbow rule picked 12, which merged populations); PCA-initialised UMAP (spectral init
-crashed at ~1M cells; only the picture changes); markers filtered at padj < 0.05 and pct.1 ≥ 33 % (smaller
+crashed on large objects; only the picture changes); markers filtered at padj < 0.05 and pct.1 ≥ 33 % (smaller
 fractions were dominated by ambient genes).
 
 Objects (`results/<run>/objects/`): qc_merged → clustered → lineage_annotated → leuko_annotated →

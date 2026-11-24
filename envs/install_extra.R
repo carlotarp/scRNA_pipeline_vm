@@ -1,6 +1,6 @@
 ## R packages not in envs/seurat5.yml (installed from GitHub / CRAN into the activated env, or into envs/R_bpcells_lib):
 ##   conda env create -f pipeline/envs/seurat5.yml && conda activate seurat5 && Rscript pipeline/envs/install_extra.R
-## Versions used by the reference run: copykat 1.2.5 (navinlabcode@01924c0), BPCells 0.3.1, nnls 1.6, yaml 2.3.12
+## Tested versions: copykat 1.2.5 (navinlabcode@01924c0), BPCells 0.3.1, nnls 1.6, yaml 2.3.12
 lib <- Sys.getenv("SCRNA_EXTRA_LIB", .libPaths()[1])
 if (!requireNamespace("remotes", quietly = TRUE)) install.packages("remotes", lib = lib)
 if (!requireNamespace("nnls", quietly = TRUE)) install.packages("nnls", lib = lib)

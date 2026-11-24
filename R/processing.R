@@ -3,7 +3,7 @@
 ##
 
 # ---------------------------------------------------------------
-# Number of PCs. integration.n_pcs in config.yaml (30 in the reference run) wins;
+# Number of PCs. integration.n_pcs in config.yaml wins;
 # with n_pcs: null the HBC heuristic is used instead, on each PC's share of the summed
 # standard deviations:
 #   co1 : first PC with cumulative share > 90 % and own share < 5 %
@@ -22,8 +22,8 @@ select_n_pcs <- function(object, reduction = "pca", fixed = cfg_get("integration
 }
 
 # ---------------------------------------------------------------
-# UMAP with PCA initialisation (uwot init = "pca"). Seurat's default spectral init crashed at
-# ~1M cells; PCA init was at least as faithful to the Harmony space. Only the 2-D picture depends
+# UMAP with PCA initialisation (uwot init = "pca"). Seurat's default spectral init crashed on
+# large objects; PCA init was at least as faithful to the Harmony space. Only the 2-D picture depends
 # on it: clusters and markers use the Harmony graph. Other settings = RunUMAP defaults.
 # ---------------------------------------------------------------
 run_umap_pca <- function(object, reduction, dims, reduction.name = "umap", n_threads = 4) {

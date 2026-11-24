@@ -14,8 +14,8 @@
 ## otherwise a pooled reference of <= copykat.pooled_ref_per_group cells per sample x T-cell type from every
 ## sample (seed copykat.seed). copykat_reference_cells.txt = union of every reference cell, so step 14 keeps
 ## the reference cells of other samples out of each sample's calls.
-## Resources (reference cohort, 16 samples, 4 cores each, 5 at a time, MemoryMax 45G per sample; peak RAM not measured):
-## time grows with the sample's cells: 3.5k cells 0.3 h, 7k 1.1-1.6 h, 10-12k 3.8-5.8 h, 14-16k 6-10.6 h.
+## Resources: run time and memory grow with the sample's cells; cores, parallel jobs and the memory cap per job
+## are set in config (resources.copykat_*, resources.max_parallel_copykat). Wall time and peak RAM: timings.tsv.
 ##
 file_arg <- sub("^--file=", "", grep("^--file=", commandArgs(FALSE), value = TRUE))
 PIPELINE_DIR <- normalizePath(file.path(dirname(file_arg), ".."))

@@ -67,7 +67,7 @@ write.csv(as.data.frame.matrix(table(Predicted = tumour$PAM50_predicted, Clinica
 
 # --- PROGENy pathway activity, stored as assay 'progeny' ---
 # Scores are per cell, so they are computed in chunks of 5,000 cells (a dense genes x all-cells matrix
-# needs >10 GB on the full data) and scaled across all cells at the end (= progeny(scale = TRUE)).
+# does not fit in memory on large data) and scaled across all cells at the end (= progeny(scale = TRUE)).
 expr <- LayerData(tumour, assay = "RNA", layer = "data")
 chunks <- split(colnames(tumour), ceiling(seq_len(ncol(tumour)) / 5000))
 progeny_scores <- do.call(rbind, lapply(chunks, function(cells)
