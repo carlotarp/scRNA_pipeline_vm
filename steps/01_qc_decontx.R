@@ -242,7 +242,8 @@ rm(merged_seurat); invisible(gc())
 plot_dimplot_by_sample(integrated, reduction = "harmony", results_path = out_dir)
 
 # Clinical annotation (optional): joined by scRNAseq_ID == sample
-clinical_file <- project_path(cfg_get("clinical_sheet"))
+clinical_file <- cfg_get("clinical_sheet")   # null = no clinical sheet
+clinical_file <- if (is.null(clinical_file)) "(none)" else project_path(clinical_file)
 if (file.exists(clinical_file)) {
   annot_df <- read.csv(clinical_file, stringsAsFactors = FALSE) %>%
     dplyr::select(scRNAseq_ID, Subtype, IGGscale_annot, pCR, TLS) %>%
