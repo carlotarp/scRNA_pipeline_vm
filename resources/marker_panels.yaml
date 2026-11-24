@@ -1,0 +1,158 @@
+# Curated marker panels for the annotation dot plots.
+# Structure: panel -> [optional sub-panel ->] group -> genes.
+# Genes absent from the matrix are dropped (and reported) by load_marker_panel().
+# Use HGNC symbols (e.g. SLC39A6, not its alias ZIP6, which is silently missing from the matrix).
+
+# --- 3a. Lineage (first-level clusters): one dot plot per block ---
+lineage:
+  leukocytes:
+    Leukocyte_pan: [PTPRC]
+    Myeloid: [CD68, CD163]
+    Tcell: [CD3E, CD3D]
+    NK: [NKG7]
+    DC: [FCER1A, IRF7, IL3RA, SPIB]
+    Neutrophil: [S100A9, S100A8]
+    Bcell: [CD79A, MS4A1]
+    Plasmablast: [MZB1, TNFRSF17, XBP1]
+    Mast: [CPA3, GATA2]
+  stromal:
+    Fibroblast_general: [PDGFRA, DCN, LUM, COL1A1, COL1A2, DPT, CD34, CXCL14, FBLN1, MFAP5, APOD]
+    matrixCAF: [FAP, COL11A1, POSTN, CTHRC1, ASPN, COMP, COL10A1, INHBA, TNC, MMP11, LOXL2, LRRC15, THBS2, FN1, COL5A2, COL8A1]
+    contractileCAF: [ACTA2, TAGLN, MYL9, TPM2, CNN1, MYH11, DES, CALD1]
+    Adipocyte: [FASN, GPAM, LEP, EBF1, PDE3B, PPARG, CD36]
+  vascular:
+    Pericyte: [RGS5, CSPG4, MCAM, PDGFRB, NOTCH3, KCNJ8, ABCC9, DES, CD248, ANPEP]
+    Endothelial: [VWF, EGFL7, FLT1, EMCN, PTPRB, ENG, CALCRL, EPAS1, ADGRL4, CLDN5, CDH5, CD34, DLL4, ACKR1, PECAM1]
+  epithelial:
+    Lum: [ESR1, PGR, BAG1, MAPT, NAT1, SLC39A6]
+    Basal_proliferation: [MKI67, CCNE1, ANLN, CDC20, EGFR, MYC]
+    Her2: [ERBB2, GRB7, BLVRA, TMEM45B]
+
+# --- 3d. Leukocyte sub-clusters ---
+leukocytes:
+  TcellNK:
+    Tcell_general: [CD3E, CD3D]
+    CD4_Tcell: [CD4]
+    CD8_Tcell: [CD8A, CD8B]
+    Tcell_activated: [CCL5]
+    Tcell_cytotoxic: [GZMA, GZMB, PRF1, GNLY]
+    Tcell_mem_cytotoxic: [TCF7]
+    Tcell_antigen_reactive: [ENTPD1]
+    Exhaustion: [TIGIT, CTLA4, ICOS, PDCD1, EOMES]
+    Treg: [CTLA4, FOXP3]
+    Tcell_naive: [SELL, IL7R]
+    Tcell_mem: [CD44]
+    Tcell_em: [CD69]
+    Tcell_cm: [CD27, CCR7]
+    Tcell_fh: [CXCR5, CXCL13]
+    NK: [NKG7]
+  Bcell:
+    Bcell_general: [CD79A, CD19, MS4A1]
+    Bcell_naive: [IGHD]
+    Bcell_activated: [IGHM]
+    Plasmablast: [IGHG1, TNFRSF17, POU2AF1, XBP1, MZB1, PIM2, CD38, IRF4, PRDM1, SDC1]
+  IGG:
+    IGG: [CD27, CD79A, HLA-C, JCHAIN, IGKC, IGLV3-25, IL2RG, CXCL8, LAX1, NTN3, PIM2, POU2AF1, TNFRSF17]
+  Myeloid:
+    TAM_general: [CD163, CD68]
+    TAM_unpolarised: [CCL7, CCL18]
+    TAM_M1_like: [CD86, CD80, IL1B, TNF, CXCL9, CXCL10, NOS2]
+    TAM_M2_like: [CD163, MRC1, MSR1, CCL18, CCL22, IL10, TGFB1, APOE, MARCO, VSIG4]
+    Monocyte: [CD14, CCR2, FCGR1A, FCGR3A, LYZ]
+  Dendritic:
+    DC_general: [CD40, CD83, HLA-DRA, ITGAX, LYZ]
+    pDC: [CD53, CLEC4C, CLEC7A, CORO1A, FCER1G, HLA-DRB1, IL3RA, NRP1, IRF8, JCHAIN, IRF7]
+    cDC: [CADM1, CD1C, CLEC10A, CLEC9A, FCER1A, FLT3, HLA-DPB1, HLA-DQA1, HLA-DQA2]
+    actDC: [LAMP3, FSCN1, IL12B]
+  Mast:
+    Mast: [CLC, CPA3, GATA2, HDC, HPGDS, IL1RL1, IL5RA, KIT, LMO4, MS4A2, MS4A3, PLIN2, TNFSF10, TPSAB1, TPSB2, SAMSN1, CD69]
+  Tcell_vs_fibroblast_doublets:     # T cells carrying CAF transcripts (doublets / ambient)
+    Tcell_general: [CD3E, CD3D]
+    CD4_Tcell: [CD4]
+    CD8_Tcell: [CD8A, CD8B]
+    NK: [NKG7]
+    Fibroblast: [COL1A1, COL1A2]
+    Treg: [FOXP3, IL2RA, CTLA4, IKZF2, TNFRSF18, TNFRSF4]
+    CAF: [THBS2, FN1, TAGLN, MYL9, TPM2, CALD1, CXCL12]
+    TCR_complex: [CD3D, CD3E, CD3G, CD247, TRAC, TRBC1, TRBC2, TRDC, TRGC1, TRGC2, CD2, CD5, CD6]
+
+# --- 3f. Stromal sub-clusters ---
+stroma:
+  CAF:
+    myCAF_contractile: [ACTA2, TAGLN, MYL9, MYH11, POSTN]
+    iCAF: [CXCL12, CXCL14, IL6, PDGFRA, CFD]
+    apCAF: [CD74, HLA-DRA, HLA-DRB1]
+    matrixCAF: [COL1A1, COL1A2, COL3A1, FN1, LUM]
+    vascularCAF: [PECAM1, RGS5, NOTCH3]
+  Endothelial:
+    Vascular_general: [PECAM1, VWF, CDH5]
+    Arterial: [GJA5, SEMA3G, HEY1]
+    Venous: [ACKR1, SELP, NR2F2]
+    Capillary: [CA4, RGCC]
+    Lymphatic: [PROX1, PDPN, LYVE1, CCL21]
+    Tip_cell: [ESM1, ANGPT2, APLN]
+  Mural:
+    Pericyte: [RGS5, PDGFRB, NOTCH3, MCAM]
+    Smooth_muscle: [MYH11, ACTA2, DES, CNN1]
+  Adipocyte:
+    Adipocyte: [ADIPOQ, PLIN1, FABP4, LEP]
+
+# --- CAF-S1 subtypes (Kieffer 2020, Cancer Discov; Croizer 2024) for the CAF check ---
+caf_s1:
+  ecm_myCAF: [ANTXR1, SDC1, LRRC15, COL10A1, ASPN, COL3A1, THY1, SFRP2, COL6A3, LRRC17]
+  TGFb_myCAF: [LAMP5, CST1, CST2, LOXL1, TGFB1, TGFB3, THBS4]
+  wound_myCAF: [CD9, SFRP4, CCDC80, OGN, SEMA3C, IGF1, IGF2]
+  IFNab_myCAF: [IFIT1, IFIT3, ISG15, MX1, OAS1, IFI6]
+  acto_myCAF: [ACTA2, MYH11, MYL9, TAGLN, GGH, PLP2]
+  detox_iCAF: [GPC3, ADH1B, GPX3, PI16, DPP4, ALDH1A1]
+  IL_iCAF: [DLK1, RGMA, SCARA5, IL6, CXCL12]
+  IFNg_iCAF: [CCL19, CD74, HLA-DRA, CXCL9, CXCL10]
+
+# --- 3j/3k. Tumour: PAM50-like genes ---
+tumour_pam50:
+  "Her2+": [ERBB2, GRB7, BLVRA, TMEM45B, FGFR4]
+  Lum: [ESR1, PGR, BAG1, MAPT, NAT1, SLC39A6]
+  TNBC: [MKI67, CCNE1, ANLN, CDC20, EGFR, MYC]
+
+# --- Tumour zooms (CopyKAT-diploid / low-RNA groups): normal vs malignant epithelium ---
+epithelial_states:
+  Normal_luminal_progenitor: [ELF5, KIT, KRT15, PIGR, LTF, SLPI, MMP7]
+  Basal_myoepithelial: [GABRP, SLC6A14, KRT5, KRT14, KRT6B, KRT16, KRT17, TP63, ACTA2]
+  Luminal_HER2: [ERBB2, GRB7, ESR1, PGR, GATA3, FOXA1, ANKRD30A, TFF1, TFF3, AGR2, XBP1]
+  Epithelial_general: [KRT8, KRT18, KRT19, EPCAM]
+  Proliferation: [MKI67, TOP2A]
+  Stress_IFN: [FOS, SOCS3, HSPA1A, IFIT1]
+  Low_quality: [MT-CO1, MALAT1]
+
+# --- CAF sub-population study (steps 17-18, subpopulations.caf in config.yaml) ---
+caf_evidence:
+  lineage_genes:
+    Fibroblast: [COL1A1, COL1A2, DCN, LUM, PDGFRA, FAP, COL10A1, MMP11, LRRC15]
+    Macrophage: [PTPRC, CD68, CD163, C1QA, C1QB, TYROBP, AIF1, LYZ, CD14, APOE, CD74, HLA-DRA, CTSB]
+    Epithelial: [EPCAM, KRT8, KRT18, KRT19, ERBB2]
+    T_cell: [CD3E, CD2]
+    Endothelial: [PECAM1, VWF]
+  own: [COL1A1, COL1A2, COL3A1, DCN, LUM, PDGFRA, FAP, POSTN]
+  foreign:
+    macrophage: [C1QA, C1QB, C1QC, CD163, CD68, TYROBP, AIF1, FCER1G, MS4A7, LYZ]
+    epithelial: [EPCAM, KRT8, KRT18, KRT19, ERBB2, KRT5, KRT14]
+  coexpression:          # first set = own lineage, the rest = foreign
+    fibroblast: [COL1A1, COL1A2, DCN, LUM]
+    macrophage: [C1QA, C1QB, CD163, TYROBP, AIF1]
+    epithelial: [EPCAM, KRT8, KRT18]
+  gate_genes: [ANTXR1, SDC1, LAMP5, LRRC15, CD9, GPC3, DLK1, CCL19]   # RNA analogue of the CAF-S1 protein gates
+  zoom_panel:
+    Fibroblast_myCAF: [COL1A1, DCN, LUM, PDGFRA, FAP, POSTN, COL11A1, COL10A1, MMP11, LRRC15, CTHRC1, INHBA, ACTA2, MYH11]
+    iCAF: [PTGDS, APOD, C3, CFD]
+    Macrophage: [PTPRC, C1QA, C1QB, C1QC, CD163, CD68, TYROBP, AIF1, FCER1G, MS4A7, LYZ, APOE, CD74, HLA-DRA]
+    Epithelial: [EPCAM, KRT8, KRT18, KRT19, ERBB2, KRT5, KRT14]
+    Other: [CD3E, PECAM1, VWF, MKI67, TOP2A, MT-CO1, MALAT1]
+
+# --- Lineage-specific genes for doublet / ambient evidence (skill scripts/cluster_evidence.R) ---
+# Highly expressed and lineage-restricted: a cell with >= 3 genes of two different blocks is a multiplet
+# candidate; 1-2 genes of a foreign block is usually ambient RNA.
+lineage_specific:
+  immune: [PTPRC, CD3E, CD3D, CD2, CD79A, MS4A1, CD68, CD163, C1QA, C1QB, TYROBP, LYZ, FCER1G, CD14]
+  fibroblast: [COL1A1, COL1A2, COL3A1, DCN, LUM, PDGFRA, FAP, POSTN]
+  endothelial: [PECAM1, VWF, CDH5, EGFL7, CLDN5, EMCN, FLT1]
+  epithelial: [EPCAM, KRT8, KRT18, KRT19, CDH1, CLDN4, ELF3, KRT7]

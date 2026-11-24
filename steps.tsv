@@ -1,0 +1,30 @@
+# id	script	kind	args	mem_max	parallel_key
+# kind: single | per_sample ({sample}, {cores} are filled in). args, mem_max, parallel_key: "-" when empty (never leave a field empty).
+01a	01_qc_decontx.R	per_sample	sample {sample}	-	resources.max_parallel_samples
+01b	01_qc_decontx.R	single	merge	-	-
+02	02_resolution.R	single	-	-	-
+03	03_cluster.R	single	-	-	-
+04	04_lineage_markers.R	single	-	-	-
+05	05_lineage_annotate.R	single	-	-	-
+06	06_leukocytes_markers.R	single	-	-	-
+07	07_leukocytes_annotate.R	single	-	-	-
+08	08_stroma_markers.R	single	-	-	-
+09	09_stroma_annotate.R	single	-	-	-
+10	10_tumour_scoring.R	single	-	-	-
+11	11_tumour_markers.R	single	-	-	-
+12	12_tumour_annotate.R	single	-	-	-
+13a	13_copykat_run.R	single	prep	-	-
+13b	13_copykat_run.R	per_sample	sample {sample} {cores}	45G	resources.max_parallel_copykat
+14	14_copykat_analysis.R	single	-	-	-
+15a	15_tumour_copykat_evidence.R	single	check	-	-
+15b	15_tumour_copykat_evidence.R	single	zoom lp	-	-
+15c	15_tumour_copykat_evidence.R	single	zoom lowrna	-	-
+16	16_tumour_copykat_annotate.R	single	-	-	-
+17a	17_subpopulation_evidence.R	single	caf check	-	-
+17b	17_subpopulation_evidence.R	single	caf profile	-	-
+17c	17_subpopulation_evidence.R	single	caf zoom	-	-
+17d	17_subpopulation_evidence.R	single	caf signatures	-	-
+17e	17_subpopulation_evidence.R	per_sample	caf ambient {sample}	-	resources.max_parallel_samples
+17f	17_subpopulation_evidence.R	single	caf joint	-	-
+17g	17_subpopulation_evidence.R	single	caf summary	-	-
+18	18_subpopulation_annotate.R	single	caf	-	-

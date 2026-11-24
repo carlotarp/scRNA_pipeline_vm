@@ -1,0 +1,106 @@
+# scRNA-seq pipeline configuration (10x GEM-X Flex, breast tumours)
+# All paths are relative to the project root (the folder that contains pipeline/),
+# unless they start with "/".
+# Values set to null are decided at a checkpoint and recorded per run in
+# results/<run_name>/decisions.yaml (pipeline/decide.R); a recorded decision overrides this file.
+
+run_name: MyRun                  # results go to <results_dir>/<run_name>/ ; never reuse an existing run
+results_dir: results
+samples: pipeline/samples.csv    # sample, raw_dir (all droplets), filtered_dir (CellRanger called cells)
+clinical_sheet: null              # optional CSV path; joined by scRNAseq_ID == sample
+bpcells_dir: data/BPCells        # on-disk count matrices (objects keep pointers here: do not move)
+r_extra_libs: [envs/R_bpcells_lib]   # R libraries outside the conda env (BPCells); missing folders are ignored
+
+# 1. Ambient RNA (DecontX, before QC)
+decontx:
+  cluster_dims: 20               # PCs of the quick per-sample clustering that guides DecontX
+  cluster_res: 0.5
+  round_counts: true             # round decontaminated counts to integers
+  min_cells: 3                   # genes kept per sample (CreateSeuratObject min.cells)
+  min_features: 200              # cells kept per sample (CreateSeuratObject min.features)
+
+# 2. Cell QC (per sample, after DecontX)
+qc:
+  max_percent_mt: 10
+  min_features: 100
+  max_features: 7500
+  nmads: 3                       # nCount / nFeature outliers, log scale, per sample
+  doublets: scDblFinder
+  seed: 1234
+
+# 3. Integration and clustering
+integration:
+  method: harmony
+  batch_key: orig.ident          # one batch per sample
+  n_pcs: 30
+  umap_init: pca
+clustering:
+  resolution_grid: [0.2, 0.3, 0.4, 0.5]
+  resolution: null               # chosen at the resolution checkpoint
+
+# 4. Markers
+markers:
+  padj: 0.05
+  min_pct1: 0.33
+
+# 5. Lineage sub-clustering (resolution chosen at each checkpoint)
+subclustering:
+  leukocytes: {n_pcs: 30, resolution: null}
+  stroma:     {n_pcs: 30, resolution: null}
+  tumour:     {n_pcs: 30, resolution: null}
+  # CopyKAT zooms (step 15) and CAF zoom (step 17): which tumour clusters to zoom into is a decision
+  tumour_lp:     {n_pcs: 30, integrate: false, clusters: null, resolution: null}
+  tumour_lowrna: {n_pcs: 30, integrate: true,  clusters: null, resolution: null}
+
+# 6. CopyKAT (tumour vs normal by CNV)
+copykat:
+  ngene_chr: 2
+  win_size: 25
+  ks_cut: 0.1
+  genome: hg20
+  min_ref_tcells: 50             # sample's own T cells as reference if >= this many
+  pooled_ref_per_group: 50       # else pooled reference: <= 50 cells per sample x T-cell type
+  seed: 42
+  ref_celltypes: [TCell_naive, TCell_cyto, Treg]   # labels of step 07 used as diploid reference
+  distance: euclidean
+  pga_threshold: 0.1             # |CNA| above which a bin counts as altered (PGA score)
+  cna_umap_pcs: 20
+  flat_quantile: 0.95            # "flat" CNA = CIN <= this quantile of the sample's T cells
+
+# 7. Label-dependent choices (null = decided at a checkpoint; the labels come from this run's dictionaries)
+tumour_copykat:
+  normal_epithelium_celltypes: null
+# 8. Sub-population studies (steps 17-18): zoom into some cell types, look for hidden sub-groups
+#    (doublets, ambient contamination, published subtypes) and re-annotate them by hand.
+#    One entry per study; run with: 17_subpopulation_evidence.R <study> <mode>, 18_subpopulation_annotate.R <study>.
+#    Marker lists: preferably panels in resources/marker_panels.yaml referenced here as "panel" or "panel.block";
+#    MANUAL_PANELS at the top of step 17 overrides them (quick tests).
+subpopulations:
+  caf:
+    input_object: annotated_copykat   # objects/<name>.rds the study starts from
+    output_object: final              # objects/<name>.rds written by step 18
+    celltypes: null                   # labels zoomed together
+    focus_celltype: null              # label under suspicion
+    compare_celltypes: null           # context types for check/profile
+    contaminant_celltype: null        # cell type whose RNA may contaminate the zoom
+    contaminant_set: macrophage       # name of the 'foreign' gene set that belongs to the contaminant
+    suspect_groups: null              # zoom clusters suspected to be doublets/contaminated
+    clean_groups: null                # zoom clusters used as clean reference
+    n_pcs: 30
+    resolution: null                  # zoom resolution
+    panels:
+      lineage_genes: caf_evidence.lineage_genes   # dot plot: focus vs compare types and the owners of each gene
+      own: caf_evidence.own                       # genes of the zoomed lineage
+      foreign: caf_evidence.foreign               # gene sets that should not be in these cells
+      coexpression: caf_evidence.coexpression     # optional: smaller sets for the same-cell co-expression test
+      zoom_panel: caf_evidence.zoom_panel         # dot plot of the zoom clusters
+      signatures: caf_s1                          # published sub-type signatures scored per zoom cluster
+      gate_genes: caf_evidence.gate_genes         # % of cells with counts > 0 per zoom cluster
+
+# Resources
+resources:
+  max_parallel_samples: 16       # 1c per-sample jobs
+  max_parallel_copykat: 5
+  copykat_memory_max: 45G        # per sample (1-10 h each, scales with cells)
+  copykat_cores: 4
+  threads_blas: 1

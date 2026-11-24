@@ -1,0 +1,3 @@
+sample,raw_dir,filtered_dir
+sample1,data/raw/sample1,data/filtered/sample1_filtered_feature_barcode_matrix
+sample2,data/raw/sample2,data/filtered/sample2_filtered_feature_barcode_matrix

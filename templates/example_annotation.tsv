@@ -1,0 +1,6 @@
+cluster	n_cells	top_markers	label	evidence
+0	5210	CD3E,CD2,TRAC,IL7R	Leukocytes	T cells (CD3E 92 %, TRAC, CD2); all samples
+1	3874	COL1A2,DCN,LUM,FAP	Stromal	fibroblasts (COL1A2 97 %, DCN, LUM)
+2	2950	EPCAM,KRT8,KRT18,ESR1	Tumor	luminal epithelium (EPCAM 88 %, KRT8, ESR1 64 %); 3 samples
+3	611	COL1A2,C1QA,CD163,APOE	Stroma_Mixed	ambiguous: fibroblast genes plus macrophage genes (31 % of cells with 3+ macrophage genes, median DecontX 0.35); kept, to be resolved in a sub-population study
+4	248	MALAT1,NEAT1,MT-CO1	DROP	low quality: median 310 genes, no programme beyond mitochondrial and nuclear transcripts; 4 % of cells
