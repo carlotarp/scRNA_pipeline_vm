@@ -99,8 +99,8 @@ subpopulations:
 
 # Resources
 resources:
-  max_parallel_samples: 16       # 1c per-sample jobs
-  max_parallel_copykat: 5
-  copykat_memory_max: 45G        # per sample (1-10 h each, scales with cells)
+  max_parallel_samples: 4        # per-sample jobs at once (steps 01, 17e); set to your machine
+  max_parallel_copykat: 2
+  copykat_memory_max: 40G        # memory cap per CopyKAT job (steps.tsv mem_max); "-" = no cap
   copykat_cores: 4
   threads_blas: 1
